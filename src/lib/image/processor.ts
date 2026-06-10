@@ -35,7 +35,7 @@ async function removeBackgroundPhotoRoom(imageBuffer: Buffer): Promise<Buffer> {
   }
 
   const formData = new FormData();
-  formData.append("image_file", new Blob([imageBuffer as unknown as BlobPart], { type: "image/jpeg" }), "image.jpg");
+  formData.append("imageFile", new Blob([imageBuffer], { type: "image/jpeg" }), "image.jpg");
 
   const res = await fetch("https://image-api.photoroom.com/v2/edit", {
     method: "POST",
@@ -68,18 +68,18 @@ async function autoRetouch(imageBuffer: Buffer): Promise<Buffer> {
 }
 
 /**
- * Compose image on white background, centered
+ * Compose image on black background, centered
  */
-async function composeOnWhite(
+async function composeOnBlack(
   imageBuffer: Buffer,
   canvasSize: number
 ): Promise<Buffer> {
   return sharp(imageBuffer)
     .resize(canvasSize, canvasSize, {
       fit: "contain",
-      background: { r: 255, g: 255, b: 255, alpha: 1 },
+      background: { r: 0, g: 0, b: 0, alpha: 1 },
     })
-    .flatten({ background: { r: 255, g: 255, b: 255 } })
+    .flatten({ background: { r: 0, g: 0, b: 0 } })
     .jpeg({ quality: 92 })
     .toBuffer();
 }
@@ -103,7 +103,7 @@ async function processSingleImage(imageBuffer: Buffer): Promise<Buffer> {
     // ignore retouch failure
   }
 
-  return composeOnWhite(processed, OUTPUT_SIZE);
+  return composeOnBlack(processed, OUTPUT_SIZE);
 }
 
 /**
@@ -147,7 +147,7 @@ export async function processItemImages(
 
       const filePath = `${itemId}/${i}.jpg`;
       const publicUrl = await uploadToStorage(filePath, processed);
-      processedUrls.push(publicUrl);
+      processedUrls.push(`${publicUrl}?v=${Date.now()}`);
     } catch (err) {
       console.error(`Image processing failed for ${imageUrls[i]}:`, err);
     }

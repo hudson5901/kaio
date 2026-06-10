@@ -74,6 +74,8 @@ export async function batchProcess(
       return batchProcessImages(batchSize);
     case "calculate_costs":
       return batchCalculateCosts(batchSize);
+    case "classify":
+      return batchClassify(batchSize);
     default:
       throw new Error(`Unknown action: ${action}`);
   }
@@ -337,6 +339,7 @@ async function batchCalculateCosts(batchSize: number) {
         lengthCm: item.lengthCm,
         widthCm: item.widthCm,
         heightCm: item.heightCm,
+        kabutoCategory: item.kabutoCategory,
         exchangeRate,
       });
 
@@ -356,4 +359,62 @@ async function batchCalculateCosts(batchSize: number) {
   }
 
   return { processed, remaining: remaining[0].count - processed, errors };
+}
+
+/**
+ * 未分類アイテムをルールベースで自動分類
+ */
+async function batchClassify(batchSize: number) {
+  const { classifyByRules } = await import("@/lib/kabuto/classifier");
+  const { getCategory } = await import("@/lib/kabuto/categories");
+
+  const items = await db.query.items.findMany({
+    where: and(
+      eq(schema.items.mercariStatus, "available"),
+      isNull(schema.items.kabutoCategory)
+    ),
+    limit: batchSize,
+  });
+
+  const remainingResult = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(schema.items)
+    .where(and(
+      eq(schema.items.mercariStatus, "available"),
+      isNull(schema.items.kabutoCategory)
+    ));
+
+  const errors: string[] = [];
+  let processed = 0;
+
+  for (const item of items) {
+    try {
+      const result = classifyByRules(
+        item.mercariTitle,
+        item.mercariDescription || "",
+        item.mercariPrice
+      );
+      const category = getCategory(result.category);
+
+      const updates: Record<string, unknown> = {
+        kabutoCategory: result.category,
+        kabutoCategoryConfidence: result.confidence,
+        ebayAspects: JSON.stringify(category.defaultAspects),
+        updatedAt: new Date().toISOString(),
+      };
+
+      // 重量・サイズが未設定ならカテゴリデフォルトを適用
+      if (!item.weightG) updates.weightG = category.defaultWeightG;
+      if (!item.lengthCm) updates.lengthCm = category.defaultDimensions.lengthCm;
+      if (!item.widthCm) updates.widthCm = category.defaultDimensions.widthCm;
+      if (!item.heightCm) updates.heightCm = category.defaultDimensions.heightCm;
+
+      await db.update(schema.items).set(updates).where(eq(schema.items.id, item.id));
+      processed++;
+    } catch (err) {
+      errors.push(`${item.mercariId}: ${err}`);
+    }
+  }
+
+  return { processed, remaining: Math.max(0, remainingResult[0].count - processed), errors };
 }

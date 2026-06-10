@@ -81,6 +81,7 @@ export async function PATCH(
         lengthCm: item.lengthCm,
         widthCm: item.widthCm,
         heightCm: item.heightCm,
+        kabutoCategory: item.kabutoCategory,
         ebayFeeRate: settings.ebayFeePercent / 100,
         adRate: settings.adPercent / 100,
         customsRate: settings.customsDutyPercent / 100,
@@ -222,6 +223,9 @@ export async function PATCH(
         "mercariStatus",
         "ebayStatus",
         "decision",
+        "kabutoCategory",
+        "kabutoCategoryConfidence",
+        "ebayAspects",
       ];
 
       const updates: Record<string, unknown> = {};

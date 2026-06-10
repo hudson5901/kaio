@@ -43,6 +43,11 @@ export async function runServerPipeline(
     // 処理対象の件数を取得
     const counts = await getProcessingCounts();
 
+    // Step 1.5: 自動分類（ルールベース）
+    const countsCls = await getProcessingCounts();
+    await runBatchStep("classify", "classify", countsCls.needsClassify);
+    if (isAborted()) { setRunning(false); return; }
+
     // Step 2: 詳細取得
     await runBatchStep("details", "fetch_details", counts.needsDetails);
     if (isAborted()) { setRunning(false); return; }
@@ -82,6 +87,7 @@ export async function runSingleStep(
       case "infer_images": total = counts.needsInferImages; break;
       case "process_images": total = counts.needsImages; break;
       case "calculate_costs": total = counts.needsCosts; break;
+      case "classify": total = counts.needsClassify; break;
       default: total = 0;
     }
 
@@ -140,7 +146,7 @@ async function getProcessingCounts() {
   const { db, schema } = await import("@/lib/db");
   const { eq, and, isNull, or, sql } = await import("drizzle-orm");
 
-  const [noDesc, fewImages, noImg, noCost] = await Promise.all([
+  const [noDesc, fewImages, noImg, noCost, noCategory] = await Promise.all([
     db.select({ count: sql<number>`count(*)` }).from(schema.items).where(
       and(
         eq(schema.items.mercariStatus, "available"),
@@ -160,6 +166,9 @@ async function getProcessingCounts() {
     db.select({ count: sql<number>`count(*)` }).from(schema.items).where(
       and(eq(schema.items.mercariStatus, "available"), isNull(schema.items.shippingCostUsd))
     ),
+    db.select({ count: sql<number>`count(*)` }).from(schema.items).where(
+      and(eq(schema.items.mercariStatus, "available"), isNull(schema.items.kabutoCategory))
+    ),
   ]);
 
   return {
@@ -167,5 +176,6 @@ async function getProcessingCounts() {
     needsInferImages: fewImages[0].count,
     needsImages: noImg[0].count,
     needsCosts: noCost[0].count,
+    needsClassify: noCategory[0].count,
   };
 }

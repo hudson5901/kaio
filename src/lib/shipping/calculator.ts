@@ -121,6 +121,7 @@ export function calculateCosts(params: {
   widthCm?: number | null;
   heightCm?: number | null;
   exchangeRate?: number;
+  kabutoCategory?: string | null; // カテゴリ別デフォルト重量用
   // 料率（設定画面から渡す）
   ebayFeeRate?: number;
   adRate?: number;
@@ -140,8 +141,16 @@ export function calculateCosts(params: {
     profitMargin = DEFAULT_PROFIT_MARGIN,
   } = params;
 
-  // --- 重量 ---
-  let effectiveWeight = weightG || DEFAULT_WEIGHT_G;
+  // --- 重量 (カテゴリ別デフォルトを使用) ---
+  let categoryDefaultWeight = DEFAULT_WEIGHT_G;
+  if (params.kabutoCategory) {
+    try {
+      const { getCategory } = require("@/lib/kabuto/categories");
+      const cat = getCategory(params.kabutoCategory);
+      if (cat) categoryDefaultWeight = cat.defaultWeightG;
+    } catch { /* ignore */ }
+  }
+  let effectiveWeight = weightG || categoryDefaultWeight;
 
   if (lengthCm && widthCm && heightCm) {
     const vol = calculateVolumetricWeight(lengthCm, widthCm, heightCm);

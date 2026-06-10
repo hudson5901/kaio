@@ -73,6 +73,11 @@ export const items = pgTable("items", {
   adCostUsd: real("ad_cost_usd"),
   estimatedProfitUsd: real("estimated_profit_usd"),
 
+  // 兜カテゴリ分類
+  kabutoCategory: text("kabuto_category"), // "A"~"F"
+  kabutoCategoryConfidence: real("kabuto_category_confidence"), // 0.0~1.0
+  ebayAspects: text("ebay_aspects"), // JSON: {"Type": ["Kabuto"], "Material": ["Iron"], ...}
+
   // 判定ステータス (出品/検討/パス)
   decision: text("decision", {
     enum: ["list", "considering", "pass"],
