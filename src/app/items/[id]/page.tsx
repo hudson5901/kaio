@@ -184,7 +184,7 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-4 min-w-0">
         {/* Left: Images */}
         <div className="space-y-4">
           {/* Main Image */}
@@ -355,7 +355,7 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
               {/* 仕入れ → 販売価格 */}
               <div className="flex items-center justify-between">
                 <span className="text-xs text-muted-foreground">メルカリ仕入れ</span>
-                <span className="text-base font-bold tabular-nums">¥{item.mercariPrice.toLocaleString()}</span>
+                <span className="text-base font-bold tabular-nums">¥{(item.mercariPrice || 0).toLocaleString()}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-xs text-muted-foreground">eBay販売価格</span>
@@ -410,7 +410,7 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
                     <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider pb-1">経費</p>
                     <div className="flex justify-between text-xs">
                       <span className="text-muted-foreground">メルカリ仕入れ</span>
-                      <span className="tabular-nums text-red-400">-¥{item.mercariPrice.toLocaleString()}</span>
+                      <span className="tabular-nums text-red-400">-¥{(item.mercariPrice || 0).toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between text-xs">
                       <span className="text-muted-foreground">EMS送料（{item.weightG ? `${item.weightG}g` : "2000g"}）</span>
@@ -846,7 +846,7 @@ function EbayPreview({
                   <span className="text-2xl font-bold text-gray-900">
                     US ${item.ebayPriceUsd?.toFixed(2) || "0.00"}
                   </span>
-                  <span className="text-xs text-gray-500">approx. ¥{item.mercariPrice.toLocaleString()}</span>
+                  <span className="text-xs text-gray-500">approx. ¥{(item.mercariPrice || 0).toLocaleString()}</span>
                 </div>
 
                 {/* Condition */}

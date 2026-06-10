@@ -82,8 +82,8 @@ export default function ItemsPage() {
     // ソート
     result = [...result].sort((a, b) => {
       switch (sortKey) {
-        case "price_asc": return a.mercariPrice - b.mercariPrice;
-        case "price_desc": return b.mercariPrice - a.mercariPrice;
+        case "price_asc": return (a.mercariPrice || 0) - (b.mercariPrice || 0);
+        case "price_desc": return (b.mercariPrice || 0) - (a.mercariPrice || 0);
         case "profit_desc": return (b.estimatedProfitUsd || -999) - (a.estimatedProfitUsd || -999);
         case "profit_asc": return (a.estimatedProfitUsd || 999) - (b.estimatedProfitUsd || 999);
         case "ebay_price": return (b.ebayPriceUsd || 0) - (a.ebayPriceUsd || 0);
@@ -102,9 +102,14 @@ export default function ItemsPage() {
 
   async function fetchItems() {
     setLoading(true);
-    const res = await fetch("/api/items");
-    setItems(await res.json());
-    setLoading(false);
+    try {
+      const res = await fetch("/api/items");
+      if (res.ok) {
+        const data = await res.json();
+        setItems(Array.isArray(data) ? data : []);
+      }
+    } catch { /* ignore */ }
+    finally { setLoading(false); }
   }
 
   function toggleSelect(id: string) {
@@ -162,9 +167,9 @@ export default function ItemsPage() {
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div className="flex items-end justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">アイテム管理</h1>
+          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">アイテム管理</h1>
           <div className="flex items-center gap-4 mt-1">
             <span className="text-[13px] text-muted-foreground">{items.length}件</span>
             <div className="flex items-center gap-3 text-[12px] text-muted-foreground">
@@ -188,7 +193,7 @@ export default function ItemsPage() {
 
       {/* Filters & Controls - Notion-style toolbar */}
       <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-2 py-2">
+        <div className="flex flex-wrap items-center gap-2 py-2">
           {/* Search */}
           <div className="relative flex-1 max-w-xs">
             <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/50" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -321,7 +326,7 @@ export default function ItemsPage() {
         </div>
       ) : view === "grid" ? (
         /* Grid View */
-        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {paged.map((item) => {
             let images: string[] = []; try { images = item.mercariImages ? JSON.parse(item.mercariImages) : []; } catch { /* ignore */ }
             const isSelected = selected.has(item.id);
@@ -381,7 +386,7 @@ export default function ItemsPage() {
                       </div>
                     )}
                     <div className="flex items-center justify-between mt-1">
-                      <span className="text-[12px] text-muted-foreground tabular-nums">¥{item.mercariPrice.toLocaleString()}</span>
+                      <span className="text-[12px] text-muted-foreground tabular-nums">¥{(item.mercariPrice || 0).toLocaleString()}</span>
                       {item.ebayPriceUsd ? (
                         <span className="text-[12px] font-medium text-primary tabular-nums">${item.ebayPriceUsd}</span>
                       ) : null}
@@ -404,7 +409,7 @@ export default function ItemsPage() {
         </div>
       ) : (
         /* List View - Notion-like clean table */
-        <div className="border border-border/60 rounded-lg overflow-hidden">
+        <div className="border border-border/60 rounded-lg overflow-x-auto">
           {/* Table header */}
           <div className="grid grid-cols-[32px_36px_1fr_72px_80px_80px_44px_80px_80px_60px] gap-0 px-3 py-2.5 border-b border-border/60 text-[11px] font-medium text-muted-foreground/70 uppercase tracking-wider bg-accent/30">
             <span className="flex items-center">
@@ -477,7 +482,7 @@ export default function ItemsPage() {
                       </span>
                     ) : <span className="text-[13px] text-muted-foreground/30">--</span>}
                   </span>
-                  <span className="text-[13px] text-right tabular-nums text-muted-foreground">¥{item.mercariPrice.toLocaleString()}</span>
+                  <span className="text-[13px] text-right tabular-nums text-muted-foreground">¥{(item.mercariPrice || 0).toLocaleString()}</span>
                   <span className="text-[13px] text-right tabular-nums">{item.ebayPriceUsd ? `$${item.ebayPriceUsd}` : <span className="text-muted-foreground/30">--</span>}</span>
                   <span className={`text-[12px] text-right tabular-nums font-medium ${item.aiScore != null && item.aiScore >= 70 ? "text-emerald-500" : item.aiScore != null && item.aiScore >= 40 ? "text-amber-500" : item.aiScore != null ? "text-red-400" : ""}`}>
                     {item.aiScore != null ? item.aiScore : <span className="text-muted-foreground/30">--</span>}

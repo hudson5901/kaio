@@ -1,27 +1,8 @@
 import sharp from "sharp";
-import {
-  segmentForeground,
-  applySegmentationMask,
-} from "@imgly/background-removal-node";
 import { createClient } from "@supabase/supabase-js";
-import { validateBgRemoval } from "./validator";
 
 const OUTPUT_SIZE = 1600; // eBay recommended
 const BUCKET = "processed-images";
-const VALIDATION_THRESHOLD = 70;
-const MAX_RETRIES = 3;
-
-interface MaskParams {
-  blur: number;
-  threshold: number;
-  postBlur: number;
-}
-
-const MASK_PRESETS: MaskParams[] = [
-  { blur: 1.5, threshold: 128, postBlur: 0.5 }, // デフォルト
-  { blur: 2.0, threshold: 100, postBlur: 0.8 }, // 前景保持寄り（切り取りすぎ防止）
-  { blur: 1.0, threshold: 160, postBlur: 0.3 }, // ハロー除去寄り（残り背景除去）
-];
 
 function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -43,6 +24,37 @@ async function downloadImage(url: string): Promise<Buffer> {
 }
 
 /**
+ * PhotoRoom API で背景除去
+ * API Key が未設定の場合はスキップして元画像を返す
+ */
+async function removeBackgroundPhotoRoom(imageBuffer: Buffer): Promise<Buffer> {
+  const apiKey = process.env.PHOTOROOM_API_KEY;
+  if (!apiKey) {
+    console.log("[画像処理] PHOTOROOM_API_KEY未設定、背景除去スキップ");
+    return imageBuffer;
+  }
+
+  const formData = new FormData();
+  formData.append("image_file", new Blob([imageBuffer as unknown as BlobPart], { type: "image/jpeg" }), "image.jpg");
+
+  const res = await fetch("https://image-api.photoroom.com/v2/edit", {
+    method: "POST",
+    headers: {
+      "x-api-key": apiKey,
+      Accept: "image/png",
+    },
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`PhotoRoom API failed: ${res.status} ${text}`);
+  }
+
+  return Buffer.from(await res.arrayBuffer());
+}
+
+/**
  * Auto-retouch: enhance brightness, contrast, sharpness
  */
 async function autoRetouch(imageBuffer: Buffer): Promise<Buffer> {
@@ -56,129 +68,42 @@ async function autoRetouch(imageBuffer: Buffer): Promise<Buffer> {
 }
 
 /**
- * ML モデルで生マスクを生成（重い処理、1回だけ実行）
+ * Compose image on white background, centered
  */
-async function generateRawMask(imageBlob: Blob): Promise<Buffer> {
-  const maskBlob = await segmentForeground(imageBlob, {
-    model: "medium",
-    output: { format: "image/png", quality: 1 },
-  });
-  return Buffer.from(await maskBlob.arrayBuffer());
-}
-
-/**
- * 生マスクにパラメータを適用して精製し、元画像に合成
- * リトライ時はこの関数だけ再実行（ML推論をスキップ）
- */
-async function applyRefinedMask(
-  imageBlob: Blob,
-  rawMask: Buffer,
-  params: MaskParams
-): Promise<Buffer> {
-  const refinedMask = await sharp(rawMask)
-    .grayscale()
-    .blur(params.blur)
-    .threshold(params.threshold)
-    .blur(params.postBlur)
-    .png()
-    .toBuffer();
-
-  const maskAsBlob = new Blob([new Uint8Array(refinedMask)], {
-    type: "image/png",
-  });
-  const result = await applySegmentationMask(imageBlob, maskAsBlob, {
-    output: { format: "image/png", quality: 1 },
-  });
-  return Buffer.from(await result.arrayBuffer());
-}
-
-/**
- * Compose image on black background, centered at 85% of canvas
- */
-async function composeOnBlack(
+async function composeOnWhite(
   imageBuffer: Buffer,
   canvasSize: number
 ): Promise<Buffer> {
   return sharp(imageBuffer)
     .resize(canvasSize, canvasSize, {
       fit: "contain",
-      background: { r: 0, g: 0, b: 0, alpha: 1 },
+      background: { r: 255, g: 255, b: 255, alpha: 1 },
     })
-    .flatten({ background: { r: 0, g: 0, b: 0 } })
+    .flatten({ background: { r: 255, g: 255, b: 255 } })
     .jpeg({ quality: 92 })
     .toBuffer();
 }
 
 /**
- * Process a single image: remove background + validate + retouch + compose on black
- *
- * バリデーションループ:
- * - ML推論は1回だけ実行し、マスクパラメータを変えて最大3回試行
- * - スコア70以上で合格 → 即return
- * - 全試行不合格 → 最高スコアの結果を返す
- * - バリデーションAPIエラー → 現在の結果を受け入れて中断
+ * Process a single image: remove background + retouch + compose on white
  */
 async function processSingleImage(imageBuffer: Buffer): Promise<Buffer> {
-  // 1. ML推論で生マスクを1回だけ生成
-  const imageBlob = new Blob([new Uint8Array(imageBuffer)], {
-    type: "image/jpeg",
-  });
-  let rawMask: Buffer;
+  let processed: Buffer;
+
   try {
-    rawMask = await generateRawMask(imageBlob);
+    processed = await removeBackgroundPhotoRoom(imageBuffer);
   } catch (err) {
-    console.error("Background removal failed, falling back to original:", err);
-    let processed = imageBuffer;
-    try {
-      processed = await autoRetouch(processed);
-    } catch {
-      // ignore retouch failure
-    }
-    return composeOnBlack(processed, OUTPUT_SIZE);
+    console.error("Background removal failed, using original:", err);
+    processed = imageBuffer;
   }
 
-  // 2. マスクパラメータを変えてリトライ＋バリデーション
-  let bestResult: Buffer | null = null;
-  let bestScore = -1;
-
-  for (let i = 0; i < MAX_RETRIES; i++) {
-    const params = MASK_PRESETS[i];
-    const bgRemoved = await applyRefinedMask(imageBlob, rawMask, params);
-
-    let retouched: Buffer;
-    try {
-      retouched = await autoRetouch(bgRemoved);
-    } catch {
-      retouched = bgRemoved;
-    }
-
-    const composed = await composeOnBlack(retouched, OUTPUT_SIZE);
-
-    // バリデーション
-    const { score, reason } = await validateBgRemoval(composed);
-    console.log(
-      `  Attempt ${i + 1}/${MAX_RETRIES} (blur=${params.blur}, thresh=${params.threshold}): score=${score} - ${reason}`
-    );
-
-    // APIエラー（score=-1）→ 現在の結果を受け入れて中断
-    if (score < 0) {
-      return composed;
-    }
-
-    if (score > bestScore) {
-      bestScore = score;
-      bestResult = composed;
-    }
-
-    // 合格 → 即return
-    if (score >= VALIDATION_THRESHOLD) {
-      return composed;
-    }
+  try {
+    processed = await autoRetouch(processed);
+  } catch {
+    // ignore retouch failure
   }
 
-  // 全試行不合格 → 最高スコアの結果を返す
-  console.log(`  All attempts below threshold, using best score: ${bestScore}`);
-  return bestResult!;
+  return composeOnWhite(processed, OUTPUT_SIZE);
 }
 
 /**

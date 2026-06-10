@@ -58,11 +58,27 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <>
+      {/* Mobile overlay backdrop */}
+      {!collapsed && (
+        <div
+          className="fixed inset-0 z-20 bg-black/50 lg:hidden"
+          onClick={toggleSidebar}
+        />
+      )}
       <Sidebar collapsed={collapsed} onToggle={toggleSidebar} />
-      <div className={`flex-1 min-h-screen transition-all duration-200 ${collapsed ? "ml-14" : "ml-60"}`}>
+      <div className={`flex-1 min-h-screen transition-all duration-200 ${collapsed ? "lg:ml-14 ml-0" : "lg:ml-60 ml-0"}`}>
         {/* Fixed Header */}
-        <header className="sticky top-0 z-20 h-12 border-b border-border/50 bg-background/80 backdrop-blur-md flex items-center justify-between px-10">
+        <header className="sticky top-0 z-20 h-12 border-b border-border/50 bg-background/80 backdrop-blur-md flex items-center justify-between px-4 sm:px-10">
           <div className="flex items-center gap-3">
+            {/* Mobile hamburger */}
+            <button
+              onClick={toggleSidebar}
+              className="lg:hidden w-8 h-8 rounded-md flex items-center justify-center text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+              </svg>
+            </button>
             <h2 className="text-[13px] font-semibold tracking-tight">{pageTitle}</h2>
           </div>
           <div className="flex items-center gap-2">
@@ -95,7 +111,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
         <main>
-          <div className="px-10 py-3 max-w-[1200px] animate-fade-in">{children}</div>
+          <div className="px-4 sm:px-10 py-3 max-w-[1200px] animate-fade-in">{children}</div>
         </main>
       </div>
     </>

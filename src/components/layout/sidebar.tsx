@@ -100,7 +100,7 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
   return (
     <aside
       className={`fixed inset-y-0 left-0 bg-sidebar flex flex-col z-30 transition-all duration-200 ${
-        collapsed ? "w-14" : "w-60"
+        collapsed ? "w-14 -translate-x-full lg:translate-x-0" : "w-60"
       }`}
     >
       {/* Header with toggle */}
