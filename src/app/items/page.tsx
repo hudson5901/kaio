@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/select";
 import Link from "next/link";
 import type { Item } from "@/lib/db/schema";
+import { checkShouldPass } from "@/lib/kabuto/pass-checker";
 
 const statusLabels: Record<string, string> = {
   available: "在庫あり",
@@ -36,13 +37,14 @@ function StatusDot({ status }: { status: string }) {
   return <span className={`inline-block w-[6px] h-[6px] rounded-full ${statusColors[status] || "bg-zinc-400"}`} />;
 }
 
-type SortKey = "date" | "price_asc" | "price_desc" | "profit_desc" | "profit_asc" | "ebay_price" | "ai_score" | "likes_desc";
+type SortKey = "date" | "updated" | "price_asc" | "price_desc" | "profit_desc" | "profit_asc" | "ebay_price" | "ai_score" | "likes_desc";
 
 const ITEMS_PER_PAGE = 30;
 
 export default function ItemsPage() {
   const [items, setItems] = useState<Item[]>([]);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [mercariFilter, setMercariFilter] = useState("all");
   const [ebayFilter, setEbayFilter] = useState("all");
   const [decisionFilter, setDecisionFilter] = useState("all");
@@ -55,15 +57,21 @@ export default function ItemsPage() {
 
   useEffect(() => { fetchItems(); }, []);
 
+  // 検索デバウンス
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 200);
+    return () => clearTimeout(timer);
+  }, [search]);
+
   // フィルタ変更時にページリセット
-  useEffect(() => { setPage(1); }, [search, mercariFilter, ebayFilter, decisionFilter, sortKey]);
+  useEffect(() => { setPage(1); }, [debouncedSearch, mercariFilter, ebayFilter, decisionFilter, sortKey]);
 
   const filtered = useMemo(() => {
     let result = items;
 
     // 検索
-    if (search) {
-      const q = search.toLowerCase();
+    if (debouncedSearch) {
+      const q = debouncedSearch.toLowerCase();
       result = result.filter(
         (i) => i.mercariTitle.toLowerCase().includes(q) ||
           i.mercariDescription?.toLowerCase().includes(q) ||
@@ -76,12 +84,14 @@ export default function ItemsPage() {
     if (ebayFilter !== "all") result = result.filter((i) => i.ebayStatus === ebayFilter);
     if (decisionFilter !== "all") {
       if (decisionFilter === "none") result = result.filter((i) => !i.decision);
+      else if (decisionFilter === "auto_pass") result = result.filter((i) => !i.decision && checkShouldPass(i.mercariTitle, i.mercariDescription, i.mercariPrice).shouldPass);
       else result = result.filter((i) => i.decision === decisionFilter);
     }
 
     // ソート
     result = [...result].sort((a, b) => {
       switch (sortKey) {
+        case "updated": return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
         case "price_asc": return (a.mercariPrice || 0) - (b.mercariPrice || 0);
         case "price_desc": return (b.mercariPrice || 0) - (a.mercariPrice || 0);
         case "profit_desc": return (b.estimatedProfitUsd || -999) - (a.estimatedProfitUsd || -999);
@@ -95,10 +105,17 @@ export default function ItemsPage() {
     });
 
     return result;
-  }, [items, search, mercariFilter, ebayFilter, decisionFilter, sortKey]);
+  }, [items, debouncedSearch, mercariFilter, ebayFilter, decisionFilter, sortKey]);
 
   const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
   const paged = filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
+
+  // フィルタ済みIDリストをsessionStorageに保存（詳細ページの前後ナビで使用）
+  useEffect(() => {
+    try {
+      sessionStorage.setItem("kaio-filtered-ids", JSON.stringify(filtered.map(i => i.id)));
+    } catch { /* ignore */ }
+  }, [filtered]);
 
   async function fetchItems() {
     setLoading(true);
@@ -191,6 +208,33 @@ export default function ItemsPage() {
         </Link>
       </div>
 
+      {/* Decision Filter Tabs - Primary Filter */}
+      <div className="flex items-center gap-1 border-b border-border/50 pb-0">
+        {([
+          { value: "all", label: "全て", count: items.length },
+          { value: "none", label: "未判定", count: items.filter(i => !i.decision).length },
+          { value: "auto_pass", label: "AI:パス推薦", count: items.filter(i => !i.decision && checkShouldPass(i.mercariTitle, i.mercariDescription, i.mercariPrice).shouldPass).length },
+          { value: "list", label: "出品", count: items.filter(i => i.decision === "list").length },
+          { value: "considering", label: "検討", count: items.filter(i => i.decision === "considering").length },
+          { value: "pass", label: "パス", count: items.filter(i => i.decision === "pass").length },
+        ] as const).map(({ value, label, count }) => (
+          <button
+            key={value}
+            onClick={() => setDecisionFilter(value)}
+            className={`px-3 py-2 text-[13px] font-medium border-b-2 transition-colors -mb-px ${
+              decisionFilter === value
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
+            }`}
+          >
+            {label}
+            <span className={`ml-1.5 text-[11px] tabular-nums ${decisionFilter === value ? "text-primary" : "text-muted-foreground/50"}`}>
+              {count}
+            </span>
+          </button>
+        ))}
+      </div>
+
       {/* Filters & Controls - Notion-style toolbar */}
       <div className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-2 py-2">
@@ -231,18 +275,6 @@ export default function ItemsPage() {
               <SelectItem value="removed">削除済み</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={decisionFilter} onValueChange={(v) => setDecisionFilter(v ?? "all")}>
-            <SelectTrigger className="w-[120px] h-8 text-[12px] border-border/50">
-              <SelectValue placeholder="判定" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">判定: 全て</SelectItem>
-              <SelectItem value="list">出品</SelectItem>
-              <SelectItem value="considering">検討</SelectItem>
-              <SelectItem value="pass">パス</SelectItem>
-              <SelectItem value="none">未判定</SelectItem>
-            </SelectContent>
-          </Select>
 
           {/* Sort */}
           <Select value={sortKey} onValueChange={(v) => setSortKey(v as SortKey)}>
@@ -251,6 +283,7 @@ export default function ItemsPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="date">新しい順</SelectItem>
+              <SelectItem value="updated">更新順</SelectItem>
               <SelectItem value="price_desc">仕入れ高い順</SelectItem>
               <SelectItem value="price_asc">仕入れ安い順</SelectItem>
               <SelectItem value="profit_desc">利益大きい順</SelectItem>
@@ -356,7 +389,7 @@ export default function ItemsPage() {
                 >
                   <div className="aspect-square relative bg-accent overflow-hidden">
                     {images[0] ? (
-                      <img src={images[0]} alt="" className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300 ease-out" />
+                      <img src={images[0]} alt="" loading="lazy" className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300 ease-out" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-muted-foreground/30">
                         <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}><path strokeLinecap="round" strokeLinejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" /></svg>
@@ -411,7 +444,7 @@ export default function ItemsPage() {
         /* List View - Notion-like clean table */
         <div className="border border-border/60 rounded-lg overflow-x-auto">
           {/* Table header */}
-          <div className="grid grid-cols-[32px_36px_1fr_72px_80px_80px_44px_80px_80px_60px] gap-0 px-3 py-2.5 border-b border-border/60 text-[11px] font-medium text-muted-foreground/70 uppercase tracking-wider bg-accent/30">
+          <div className="grid grid-cols-[32px_36px_1fr_72px_80px_80px_44px_80px_80px_60px_60px] gap-0 px-3 py-2.5 border-b border-border/60 text-[11px] font-medium text-muted-foreground/70 uppercase tracking-wider bg-accent/30">
             <span className="flex items-center">
               <button
                 onClick={toggleSelectAll}
@@ -434,7 +467,8 @@ export default function ItemsPage() {
             <span className="text-right">AI</span>
             <span>メルカリ</span>
             <span>eBay</span>
-            <span className="text-right">日付</span>
+            <span className="text-right">作成</span>
+            <span className="text-right">更新</span>
           </div>
           {/* Table rows */}
           <div>
@@ -444,7 +478,7 @@ export default function ItemsPage() {
               return (
                 <div
                   key={item.id}
-                  className={`grid grid-cols-[32px_36px_1fr_72px_80px_80px_44px_80px_80px_60px] gap-0 px-3 py-2 items-center transition-colors ${
+                  className={`grid grid-cols-[32px_36px_1fr_72px_80px_80px_44px_80px_80px_60px_60px] gap-0 px-3 py-2 items-center transition-colors ${
                     isSelected
                       ? "bg-accent/60"
                       : "hover:bg-accent/40"
@@ -466,7 +500,7 @@ export default function ItemsPage() {
                   </span>
                   <Link href={`/items/${item.id}`}>
                     {images[0] ? (
-                      <img src={images[0]} alt="" className="w-7 h-7 rounded object-cover" />
+                      <img src={images[0]} alt="" loading="lazy" className="w-7 h-7 rounded object-cover" />
                     ) : (
                       <div className="w-7 h-7 rounded bg-accent" />
                     )}
@@ -501,6 +535,9 @@ export default function ItemsPage() {
                   </div>
                   <span className="text-[11px] text-muted-foreground/60 tabular-nums text-right">
                     {new Date(item.createdAt).toLocaleDateString("ja-JP", { month: "numeric", day: "numeric" })}
+                  </span>
+                  <span className="text-[11px] text-muted-foreground/60 tabular-nums text-right">
+                    {new Date(item.updatedAt).toLocaleDateString("ja-JP", { month: "numeric", day: "numeric" })}
                   </span>
                 </div>
               );

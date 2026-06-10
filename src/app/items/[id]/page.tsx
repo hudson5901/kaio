@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, use } from "react";
+import { useEffect, useState, useMemo, use } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Item } from "@/lib/db/schema";
 import { CommentsSection } from "@/components/comments-section";
+import { checkShouldPass, type PassCheckResult } from "@/lib/kabuto/pass-checker";
 
 const statusLabels: Record<string, string> = {
   available: "在庫あり", sold: "売り切れ", deleted: "削除済み",
@@ -37,38 +38,93 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
   const [draftTitle, setDraftTitle] = useState("");
   const [draftDesc, setDraftDesc] = useState("");
   const [draftPrice, setDraftPrice] = useState("");
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const [scoring, setScoring] = useState(false);
+  const [classifying, setClassifying] = useState(false);
   const [adjacentItems, setAdjacentItems] = useState<{ prev: string | null; next: string | null; currentIndex: number; total: number }>({ prev: null, next: null, currentIndex: 0, total: 0 });
 
-  useEffect(() => { fetchItem(); fetchAdjacentItems(); }, [id]);
+  // パスチェッカー
+  const passCheck = useMemo<PassCheckResult | null>(() => {
+    if (!item) return null;
+    return checkShouldPass(item.mercariTitle, item.mercariDescription, item.mercariPrice);
+  }, [item?.id, item?.mercariTitle, item?.mercariDescription, item?.mercariPrice]);
 
-  // キーボードで前後ナビゲーション
+  useEffect(() => { fetchItem(); fetchAdjacentItems(); setSelectedImage(0); }, [id]);
+
+  // 次のアイテムをプリフェッチ（遷移を高速化）
+  useEffect(() => {
+    if (adjacentItems.next) {
+      fetch(`/api/items/${adjacentItems.next}`).catch(() => {});
+    }
+  }, [adjacentItems.next]);
+
+  // 説明文がなければ自動取得
+  useEffect(() => {
+    if (!item || item.mercariDescription || !item.mercariId) return;
+    if (actionLoading === "fetch_details") return;
+    handleAction("fetch_details");
+  }, [item?.id]);
+
+  // 兜カテゴリが未設定なら自動AI分類
+  useEffect(() => {
+    if (!item || item.kabutoCategory || classifying) return;
+    handleClassify();
+  }, [item?.id, item?.mercariDescription]);
+
+  // キーボードショートカット: 矢印で前後、1/2/3で判定
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      // 入力中はスキップ
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       if (e.key === "ArrowLeft" && adjacentItems.prev) {
         router.push(`/items/${adjacentItems.prev}`);
       } else if (e.key === "ArrowRight" && adjacentItems.next) {
         router.push(`/items/${adjacentItems.next}`);
+      } else if (e.key === "1") {
+        handleDecision("list");
+      } else if (e.key === "2") {
+        handleDecision("considering");
+      } else if (e.key === "3") {
+        handleDecision("pass");
       }
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [adjacentItems, router]);
+  }, [adjacentItems, router, item]);
 
   async function fetchAdjacentItems() {
     try {
+      // sessionStorageからフィルタ済みIDリストを取得（一覧ページの絞り込み状態を維持）
+      let allIds: string[] | null = null;
+      try {
+        const stored = sessionStorage.getItem("kaio-filtered-ids");
+        if (stored) allIds = JSON.parse(stored);
+      } catch { /* ignore */ }
+
+      // フィルタ済みリストに現在のアイテムがあるか確認
+      if (allIds) {
+        const idx = allIds.indexOf(id);
+        if (idx !== -1) {
+          setAdjacentItems({
+            prev: idx > 0 ? allIds[idx - 1] : null,
+            next: idx < allIds.length - 1 ? allIds[idx + 1] : null,
+            currentIndex: idx,
+            total: allIds.length,
+          });
+          return;
+        }
+      }
+
+      // フォールバック: 全件から取得
       const res = await fetch("/api/items?ids_only=true");
       if (!res.ok) return;
-      const allIds: string[] = await res.json();
-      const idx = allIds.indexOf(id);
+      allIds = await res.json();
+      const idx = allIds!.indexOf(id);
       if (idx === -1) return;
       setAdjacentItems({
-        prev: idx > 0 ? allIds[idx - 1] : null,
-        next: idx < allIds.length - 1 ? allIds[idx + 1] : null,
+        prev: idx > 0 ? allIds![idx - 1] : null,
+        next: idx < allIds!.length - 1 ? allIds![idx + 1] : null,
         currentIndex: idx,
-        total: allIds.length,
+        total: allIds!.length,
       });
     } catch { /* ignore */ }
   }
@@ -76,6 +132,27 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
   async function fetchItem() {
     const res = await fetch(`/api/items/${id}`);
     if (res.ok) setItem(await res.json());
+  }
+
+  // 判定の楽観的更新 + 自動次へ
+  function handleDecision(value: string) {
+    if (!item) return;
+    const newDecision = item.decision === value ? null : value;
+
+    // 即座にUI更新
+    setItem({ ...item, decision: newDecision } as Item);
+
+    // バックグラウンドでサーバー同期
+    fetch(`/api/items/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "update", decision: newDecision }),
+    }).catch(() => {/* 失敗してもUI即反映済み、次回開いた時に再同期 */});
+
+    // 判定を設定した場合のみ、短い遅延後に次のアイテムへ自動遷移
+    if (newDecision && adjacentItems.next) {
+      setTimeout(() => router.push(`/items/${adjacentItems.next}`), 150);
+    }
   }
 
   async function handleAction(action: string, extra?: Record<string, unknown>) {
@@ -135,6 +212,26 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
     window.location.href = "/items";
   }
 
+  async function handleClassify() {
+    setClassifying(true);
+    try {
+      const res = await fetch(`/api/items/${id}/classify`, { method: "POST" });
+      const data = await res.json();
+      if (data.success) await fetchItem();
+      else alert("分類に失敗しました: " + (data.error || "unknown"));
+    } catch (err) { alert(`Error: ${err}`); }
+    finally { setClassifying(false); }
+  }
+
+  async function handleSetCategory(cat: string) {
+    await fetch(`/api/items/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "update", kabutoCategory: cat }),
+    });
+    await fetchItem();
+  }
+
   if (!item) return <div className="py-32" />;
 
   let mercariImages: string[] = [];
@@ -184,14 +281,14 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-4 min-w-0">
+      <div className="flex flex-col lg:flex-row gap-4 min-w-0">
         {/* Left: Images */}
-        <div className="space-y-4">
+        <div className="flex-1 min-w-0 space-y-4">
           {/* Main Image */}
           <div className="rounded-xl bg-card border border-border overflow-hidden">
             <div className="aspect-[3/2] bg-black flex items-center justify-center relative">
               {allImages[selectedImage] ? (
-                <img src={allImages[selectedImage]} alt="" className="max-w-full max-h-full object-contain" />
+                <img src={allImages[selectedImage]} alt="" className="max-w-full max-h-full object-contain cursor-pointer hover:opacity-90 transition-opacity" onClick={() => setLightboxImage(allImages[selectedImage])} />
               ) : (
                 <div className="text-muted-foreground">
                   <svg className="w-16 h-16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={0.5}><path strokeLinecap="round" strokeLinejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" /></svg>
@@ -240,7 +337,7 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
             {processedImages.length > 0 ? (
               <div className="grid grid-cols-4 gap-1.5 p-2.5">
                 {processedImages.map((path, i) => (
-                  <img key={i} src={path} alt="" className="rounded-lg object-cover aspect-square w-full bg-black" />
+                  <img key={i} src={path} alt="" onClick={() => setLightboxImage(path)} className="rounded-lg object-cover aspect-square w-full bg-black cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all" />
                 ))}
               </div>
             ) : (
@@ -252,28 +349,23 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
 
           {/* Description */}
           <div className="rounded-xl bg-card border border-border overflow-hidden">
-            <div className="px-4 py-2.5 border-b border-border bg-muted/30 flex items-center justify-between">
+            <div className="px-4 py-2.5 border-b border-border bg-muted/30">
               <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">商品説明</h3>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => handleAction("fetch_details")}
-                disabled={actionLoading === "fetch_details"}
-                className="text-xs h-7"
-              >
-                {actionLoading === "fetch_details" ? "取得中..." : "メルカリから取得"}
-              </Button>
             </div>
             <div className="px-4 py-3.5">
-              <p className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
-                {item.mercariDescription || "説明文なし — 「メルカリから取得」ボタンで取得できます"}
-              </p>
+              {actionLoading === "fetch_details" ? (
+                <p className="text-sm text-muted-foreground animate-pulse">メルカリから取得中...</p>
+              ) : (
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
+                  {item.mercariDescription || "説明文なし"}
+                </p>
+              )}
             </div>
           </div>
         </div>
 
         {/* Right Sidebar */}
-        <div className="space-y-3">
+        <div className="w-full lg:w-[400px] xl:w-[440px] shrink-0 space-y-3">
           {/* Title */}
           <div className="rounded-xl bg-card border border-border px-4 py-3.5">
             <h1 className="text-base font-bold leading-snug">{item.mercariTitle}</h1>
@@ -286,10 +378,10 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
             </div>
             <div className="p-3 flex gap-2">
               {([
-                { value: "list", label: "出品", icon: "M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3", color: "emerald" },
-                { value: "considering", label: "検討", icon: "M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z", color: "amber" },
-                { value: "pass", label: "パス", icon: "M6 18 18 6M6 6l12 12", color: "red" },
-              ] as const).map(({ value, label, icon, color }) => {
+                { value: "list", label: "出品", key: "1", icon: "M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3", color: "emerald" },
+                { value: "considering", label: "検討", key: "2", icon: "M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z", color: "amber" },
+                { value: "pass", label: "パス", key: "3", icon: "M6 18 18 6M6 6l12 12", color: "red" },
+              ] as const).map(({ value, label, key, icon, color }) => {
                 const isActive = item.decision === value;
                 const colorClasses = {
                   emerald: isActive ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-600 dark:text-emerald-400" : "",
@@ -299,7 +391,7 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
                 return (
                   <button
                     key={value}
-                    onClick={() => handleAction("update", { decision: isActive ? null : value })}
+                    onClick={() => handleDecision(value)}
                     className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg border py-2 text-xs font-medium transition-all ${
                       isActive
                         ? colorClasses[color]
@@ -310,9 +402,76 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
                       <path strokeLinecap="round" strokeLinejoin="round" d={icon} />
                     </svg>
                     {label}
+                    <kbd className="ml-1 text-[10px] opacity-40 font-mono">{key}</kbd>
                   </button>
                 );
               })}
+            </div>
+            {/* パスチェッカー推薦 */}
+            {passCheck && !item.decision && passCheck.shouldPass && passCheck.confidence >= 0.3 && (
+              <div className="px-3 pb-3 -mt-1">
+                <div className="flex items-center gap-2 rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2">
+                  <svg className="w-3.5 h-3.5 text-red-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z" />
+                  </svg>
+                  <span className="text-[11px] text-red-400">
+                    パス推薦 ({Math.round(passCheck.confidence * 100)}%): {passCheck.reasons.slice(0, 2).join("、")}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Kabuto Category */}
+          <div className="rounded-xl bg-card border border-border overflow-hidden">
+            <div className="px-4 py-2.5 border-b border-border bg-muted/30 flex items-center justify-between">
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">兜カテゴリ</h3>
+              <Button size="sm" variant="outline" onClick={handleClassify} disabled={classifying} className="text-xs gap-1 h-6 px-2">
+                {classifying ? (
+                  <><svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" /></svg>分類中</>
+                ) : (
+                  <><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z" /></svg>AI分類</>
+                )}
+              </Button>
+            </div>
+            <div className="p-3">
+              <div className="grid grid-cols-3 gap-1.5">
+                {([
+                  { id: "A", label: "A: 複合兜", icon: "🎎" },
+                  { id: "B", label: "B: 鎧兜セット", icon: "⚔️" },
+                  { id: "C", label: "C: 金属兜", icon: "🛡️" },
+                  { id: "D", label: "D: 江戸甲冑", icon: "🏯" },
+                  { id: "E", label: "E: 新品着用可", icon: "👹" },
+                  { id: "F", label: "F: その他", icon: "📦" },
+                ] as const).map(({ id: catId, label, icon }) => {
+                  const isActive = item.kabutoCategory === catId;
+                  return (
+                    <button
+                      key={catId}
+                      onClick={() => handleSetCategory(isActive ? "" : catId)}
+                      className={`flex items-center justify-center gap-1 rounded-lg border py-2 px-1 text-[11px] font-medium transition-all ${
+                        isActive
+                          ? "bg-primary/15 border-primary/40 text-primary"
+                          : "border-border text-muted-foreground hover:bg-accent hover:text-foreground"
+                      }`}
+                    >
+                      <span>{icon}</span>
+                      <span className="truncate">{label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              {item.kabutoCategory && item.kabutoCategoryConfidence != null && (
+                <div className="mt-2 flex items-center gap-2 text-[10px] text-muted-foreground">
+                  <span>信頼度: {Math.round(item.kabutoCategoryConfidence * 100)}%</span>
+                  <div className="flex-1 h-1 rounded-full bg-accent overflow-hidden">
+                    <div
+                      className={`h-full rounded-full ${item.kabutoCategoryConfidence >= 0.7 ? "bg-emerald-400" : item.kabutoCategoryConfidence >= 0.4 ? "bg-amber-400" : "bg-red-400"}`}
+                      style={{ width: `${item.kabutoCategoryConfidence * 100}%` }}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -679,6 +838,27 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
         setDraftDesc={setDraftDesc}
         onSave={saveListingText}
       />
+
+      {/* Lightbox overlay */}
+      {lightboxImage && (
+        <div
+          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center cursor-pointer"
+          onClick={() => setLightboxImage(null)}
+        >
+          <button
+            className="absolute top-4 right-4 text-white/70 hover:text-white text-3xl font-light z-10"
+            onClick={() => setLightboxImage(null)}
+          >
+            &times;
+          </button>
+          <img
+            src={lightboxImage}
+            alt=""
+            className="max-w-[90vw] max-h-[90vh] object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -877,36 +1057,55 @@ function EbayPreview({
                 <div className="border-t border-gray-200 pt-3">
                   <h4 className="text-sm font-semibold mb-2 text-gray-700">Item specifics</h4>
                   <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
-                    <div className="flex">
-                      <span className="text-gray-500 w-20 flex-shrink-0">Type</span>
-                      <span className="font-medium">{detectItemType(item.mercariTitle, item.mercariDescription || "")}</span>
-                    </div>
-                    <div className="flex">
-                      <span className="text-gray-500 w-20 flex-shrink-0">Origin</span>
-                      <span className="font-medium">Japan</span>
-                    </div>
+                    {(() => {
+                      let aspects: Record<string, string[]> = {};
+                      try { if (item.ebayAspects) aspects = JSON.parse(item.ebayAspects); } catch { /* */ }
+                      const hasAspects = Object.keys(aspects).length > 0;
+
+                      if (hasAspects) {
+                        return Object.entries(aspects).map(([key, values]) => (
+                          <div key={key} className="flex">
+                            <span className="text-gray-500 w-24 flex-shrink-0 text-xs">{key}</span>
+                            <span className="font-medium text-xs">{(values as string[]).join(", ")}</span>
+                          </div>
+                        ));
+                      }
+                      // フォールバック: 自動検出
+                      return (
+                        <>
+                          <div className="flex">
+                            <span className="text-gray-500 w-20 flex-shrink-0">Type</span>
+                            <span className="font-medium">{detectItemType(item.mercariTitle, item.mercariDescription || "")}</span>
+                          </div>
+                          <div className="flex">
+                            <span className="text-gray-500 w-20 flex-shrink-0">Origin</span>
+                            <span className="font-medium">Japan</span>
+                          </div>
+                        </>
+                      );
+                    })()}
                     {item.lengthCm && (
                       <div className="flex">
-                        <span className="text-gray-500 w-20 flex-shrink-0">Length</span>
-                        <span>{item.lengthCm} cm / {(item.lengthCm / 2.54).toFixed(1)}&quot;</span>
+                        <span className="text-gray-500 w-24 flex-shrink-0 text-xs">Length</span>
+                        <span className="text-xs">{item.lengthCm} cm / {(item.lengthCm / 2.54).toFixed(1)}&quot;</span>
                       </div>
                     )}
                     {item.weightG && (
                       <div className="flex">
-                        <span className="text-gray-500 w-20 flex-shrink-0">Weight</span>
-                        <span>{item.weightG}g / {(item.weightG / 453.592).toFixed(2)} lbs</span>
+                        <span className="text-gray-500 w-24 flex-shrink-0 text-xs">Weight</span>
+                        <span className="text-xs">{item.weightG}g / {(item.weightG / 453.592).toFixed(2)} lbs</span>
                       </div>
                     )}
                     {item.widthCm && (
                       <div className="flex">
-                        <span className="text-gray-500 w-20 flex-shrink-0">Width</span>
-                        <span>{item.widthCm} cm</span>
+                        <span className="text-gray-500 w-24 flex-shrink-0 text-xs">Width</span>
+                        <span className="text-xs">{item.widthCm} cm</span>
                       </div>
                     )}
                     {item.heightCm && (
                       <div className="flex">
-                        <span className="text-gray-500 w-20 flex-shrink-0">Height</span>
-                        <span>{item.heightCm} cm</span>
+                        <span className="text-gray-500 w-24 flex-shrink-0 text-xs">Height</span>
+                        <span className="text-xs">{item.heightCm} cm</span>
                       </div>
                     )}
                   </div>
