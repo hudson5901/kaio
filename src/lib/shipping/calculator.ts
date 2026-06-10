@@ -50,6 +50,7 @@ const DEFAULT_AD_RATE = 0.05;             // 5%
 const DEFAULT_CUSTOMS_RATE = 0.10;        // 骨董品 10%
 const DEFAULT_PROFIT_MARGIN = 0.30;       // 30%
 const DEFAULT_WEIGHT_G = 2000;
+const PACKAGING_OVERHEAD_CM = 7; // ダンボール梱包で各辺+7cm
 
 export interface CostBreakdown {
   // 入力
@@ -152,13 +153,19 @@ export function calculateCosts(params: {
   }
   let effectiveWeight = weightG || categoryDefaultWeight;
 
+  // 容積重量: 梱包オーバーヘッド(+7cm/辺)を加算してから計算
   if (lengthCm && widthCm && heightCm) {
-    const vol = calculateVolumetricWeight(lengthCm, widthCm, heightCm);
+    const vol = calculateVolumetricWeight(
+      lengthCm + PACKAGING_OVERHEAD_CM,
+      widthCm + PACKAGING_OVERHEAD_CM,
+      heightCm + PACKAGING_OVERHEAD_CM
+    );
     effectiveWeight = Math.max(effectiveWeight, vol);
-  } else if (lengthCm) {
-    const w = widthCm || 3;
-    const h = heightCm || 10;
-    const vol = calculateVolumetricWeight(lengthCm, w, h);
+  } else if (lengthCm || widthCm || heightCm) {
+    const l = (lengthCm || 20) + PACKAGING_OVERHEAD_CM;
+    const w = (widthCm || 20) + PACKAGING_OVERHEAD_CM;
+    const h = (heightCm || 20) + PACKAGING_OVERHEAD_CM;
+    const vol = calculateVolumetricWeight(l, w, h);
     effectiveWeight = Math.max(effectiveWeight, vol);
   }
 

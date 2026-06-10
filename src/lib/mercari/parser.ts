@@ -65,10 +65,10 @@ export function parseDimensions(description: string): Dimensions {
     }
   }
 
-  // 幅パターン
+  // 幅・間口パターン
   const widthPatterns = [
-    /(?:幅|width)[：:\s]*約?(\d+\.?\d*)\s*(?:cm|センチ)/i,
-    /(?:幅|width)[：:\s]*約?(\d+\.?\d*)\s*(?:mm|ミリ)/i,
+    /(?:幅|間口|width)[：:\s]*約?(\d+\.?\d*)\s*(?:cm|センチ)/i,
+    /(?:幅|間口|width)[：:\s]*約?(\d+\.?\d*)\s*(?:mm|ミリ)/i,
   ];
 
   for (const pattern of widthPatterns) {
@@ -81,6 +81,48 @@ export function parseDimensions(description: string): Dimensions {
         result.widthCm = value;
       }
       break;
+    }
+  }
+
+  // 高さパターン
+  if (!result.heightCm) {
+    const heightPatterns = [
+      /(?:高さ|高|height)[：:\s]*約?(\d+\.?\d*)\s*(?:cm|センチ)/i,
+      /(?:高さ|高|height)[：:\s]*約?(\d+\.?\d*)\s*(?:mm|ミリ)/i,
+    ];
+
+    for (const pattern of heightPatterns) {
+      const match = pattern.exec(description);
+      if (match) {
+        const value = parseFloat(match[1]);
+        if (pattern.source.includes("mm") || pattern.source.includes("ミリ")) {
+          result.heightCm = value / 10;
+        } else {
+          result.heightCm = value;
+        }
+        break;
+      }
+    }
+  }
+
+  // 奥行パターン → lengthCm にマッピング
+  if (!result.lengthCm) {
+    const depthPatterns = [
+      /(?:奥行[きさ]?|depth)[：:\s]*約?(\d+\.?\d*)\s*(?:cm|センチ)/i,
+      /(?:奥行[きさ]?|depth)[：:\s]*約?(\d+\.?\d*)\s*(?:mm|ミリ)/i,
+    ];
+
+    for (const pattern of depthPatterns) {
+      const match = pattern.exec(description);
+      if (match) {
+        const value = parseFloat(match[1]);
+        if (pattern.source.includes("mm") || pattern.source.includes("ミリ")) {
+          result.lengthCm = value / 10;
+        } else {
+          result.lengthCm = value;
+        }
+        break;
+      }
     }
   }
 
