@@ -35,7 +35,7 @@ async function removeBackgroundPhotoRoom(imageBuffer: Buffer): Promise<Buffer> {
   }
 
   const formData = new FormData();
-  formData.append("imageFile", new Blob([imageBuffer], { type: "image/jpeg" }), "image.jpg");
+  formData.append("imageFile", new Blob([new Uint8Array(imageBuffer)], { type: "image/jpeg" }), "image.jpg");
 
   const res = await fetch("https://image-api.photoroom.com/v2/edit", {
     method: "POST",
