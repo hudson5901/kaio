@@ -1,0 +1,10 @@
+node_modules
+.next
+kaio.db
+kaio.db-wal
+kaio.db-shm
+public/processed
+data
+drizzle
+.env.local
+.env.production.example

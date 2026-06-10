@@ -1,0 +1,378 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+
+interface User {
+  id: string;
+  email: string;
+  name: string;
+  role: "admin" | "member";
+  createdAt: string;
+  lastLoginAt: string | null;
+}
+
+export default function AdminUsersPage() {
+  const router = useRouter();
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [formData, setFormData] = useState({
+    email: "",
+    name: "",
+    password: "",
+    role: "member" as "admin" | "member",
+  });
+  const [editData, setEditData] = useState({
+    name: "",
+    email: "",
+    role: "member" as "admin" | "member",
+    password: "",
+  });
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    checkAuth();
+  }, []);
+
+  async function checkAuth() {
+    try {
+      const res = await fetch("/api/auth/me");
+      const me = await res.json();
+      if (me.error || me.role !== "admin") {
+        router.push("/");
+        return;
+      }
+      fetchUsers();
+    } catch {
+      router.push("/");
+    }
+  }
+
+  async function fetchUsers() {
+    try {
+      const res = await fetch("/api/users");
+      if (!res.ok) {
+        router.push("/");
+        return;
+      }
+      const data = await res.json();
+      setUsers(data);
+    } catch {
+      setError("ユーザー一覧の取得に失敗しました");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleCreate(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    try {
+      const res = await fetch("/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error);
+        return;
+      }
+      setShowForm(false);
+      setFormData({ email: "", name: "", password: "", role: "member" });
+      fetchUsers();
+    } catch {
+      setError("ユーザーの作成に失敗しました");
+    }
+  }
+
+  async function handleUpdate(id: string) {
+    setError("");
+    try {
+      const body: Record<string, string> = {};
+      if (editData.name) body.name = editData.name;
+      if (editData.email) body.email = editData.email;
+      if (editData.role) body.role = editData.role;
+      if (editData.password) body.password = editData.password;
+
+      const res = await fetch(`/api/users/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error);
+        return;
+      }
+      setEditingId(null);
+      fetchUsers();
+    } catch {
+      setError("ユーザーの更新に失敗しました");
+    }
+  }
+
+  async function handleDelete(id: string, name: string) {
+    if (!confirm(`「${name}」を削除してよろしいですか？`)) return;
+    setError("");
+    try {
+      const res = await fetch(`/api/users/${id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error);
+        return;
+      }
+      fetchUsers();
+    } catch {
+      setError("ユーザーの削除に失敗しました");
+    }
+  }
+
+  function startEdit(user: User) {
+    setEditingId(user.id);
+    setEditData({ name: user.name, email: user.email, role: user.role, password: "" });
+  }
+
+  function formatDate(dateStr: string | null) {
+    if (!dateStr) return "-";
+    return new Date(dateStr).toLocaleDateString("ja-JP", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-muted-foreground text-sm">読み込み中...</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-4xl mx-auto space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between pt-2">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight">ユーザー管理</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {users.length} ユーザー
+          </p>
+        </div>
+        <Button onClick={() => setShowForm(!showForm)}>
+          {showForm ? "キャンセル" : "新規ユーザー"}
+        </Button>
+      </div>
+
+      {/* Error */}
+      {error && (
+        <div className="rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2.5 text-xs text-red-400">
+          {error}
+        </div>
+      )}
+
+      {/* Create Form */}
+      {showForm && (
+        <div className="rounded-xl bg-card border border-border p-4">
+          <h2 className="text-sm font-semibold mb-3">新規ユーザー作成</h2>
+          <form onSubmit={handleCreate} className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[11px] font-medium text-muted-foreground block mb-1">
+                名前
+              </label>
+              <Input
+                value={formData.name}
+                onChange={(e) =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
+                placeholder="名前"
+                required
+              />
+            </div>
+            <div>
+              <label className="text-[11px] font-medium text-muted-foreground block mb-1">
+                メールアドレス
+              </label>
+              <Input
+                type="email"
+                value={formData.email}
+                onChange={(e) =>
+                  setFormData({ ...formData, email: e.target.value })
+                }
+                placeholder="user@example.com"
+                required
+              />
+            </div>
+            <div>
+              <label className="text-[11px] font-medium text-muted-foreground block mb-1">
+                パスワード
+              </label>
+              <Input
+                type="password"
+                value={formData.password}
+                onChange={(e) =>
+                  setFormData({ ...formData, password: e.target.value })
+                }
+                placeholder="パスワード"
+                required
+              />
+            </div>
+            <div>
+              <label className="text-[11px] font-medium text-muted-foreground block mb-1">
+                ロール
+              </label>
+              <select
+                value={formData.role}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    role: e.target.value as "admin" | "member",
+                  })
+                }
+                className="w-full h-8 rounded-lg border border-border bg-background px-3 text-sm"
+              >
+                <option value="member">メンバー</option>
+                <option value="admin">管理者</option>
+              </select>
+            </div>
+            <div className="col-span-2 flex justify-end">
+              <Button type="submit">作成</Button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* User List */}
+      <div className="rounded-xl bg-card border border-border overflow-hidden">
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-border text-xs text-muted-foreground uppercase tracking-wider">
+              <th className="text-left px-4 py-2.5 font-medium">名前</th>
+              <th className="text-left px-4 py-2.5 font-medium">メール</th>
+              <th className="text-left px-4 py-2.5 font-medium">ロール</th>
+              <th className="text-left px-4 py-2.5 font-medium">作成日</th>
+              <th className="text-right px-4 py-2.5 font-medium">操作</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {users.map((user) => (
+              <tr key={user.id} className="hover:bg-accent/30 transition-colors">
+                {editingId === user.id ? (
+                  <>
+                    <td className="px-4 py-2.5">
+                      <Input
+                        value={editData.name}
+                        onChange={(e) =>
+                          setEditData({ ...editData, name: e.target.value })
+                        }
+                        className="h-7 text-sm"
+                      />
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <Input
+                        type="email"
+                        value={editData.email}
+                        onChange={(e) =>
+                          setEditData({ ...editData, email: e.target.value })
+                        }
+                        className="h-7 text-sm"
+                      />
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <select
+                        value={editData.role}
+                        onChange={(e) =>
+                          setEditData({
+                            ...editData,
+                            role: e.target.value as "admin" | "member",
+                          })
+                        }
+                        className="h-7 rounded-md border border-border bg-background px-2 text-xs"
+                      >
+                        <option value="member">メンバー</option>
+                        <option value="admin">管理者</option>
+                      </select>
+                    </td>
+                    <td className="px-4 py-2.5 text-xs text-muted-foreground">
+                      {formatDate(user.createdAt)}
+                    </td>
+                    <td className="px-4 py-2.5 text-right">
+                      <div className="flex gap-2 justify-end">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs"
+                          onClick={() => handleUpdate(user.id)}
+                        >
+                          保存
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 text-xs"
+                          onClick={() => setEditingId(null)}
+                        >
+                          取消
+                        </Button>
+                      </div>
+                    </td>
+                  </>
+                ) : (
+                  <>
+                    <td className="px-4 py-2.5 text-sm font-medium">
+                      {user.name}
+                    </td>
+                    <td className="px-4 py-2.5 text-sm text-muted-foreground">
+                      {user.email}
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <span
+                        className={`inline-flex items-center px-1.5 py-px rounded text-[10px] font-medium ${
+                          user.role === "admin"
+                            ? "bg-purple-500/15 text-purple-400"
+                            : "bg-muted text-muted-foreground"
+                        }`}
+                      >
+                        {user.role === "admin" ? "管理者" : "メンバー"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2.5 text-xs text-muted-foreground">
+                      {formatDate(user.createdAt)}
+                    </td>
+                    <td className="px-4 py-2.5 text-right">
+                      <div className="flex gap-2 justify-end">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 text-xs"
+                          onClick={() => startEdit(user)}
+                        >
+                          編集
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 text-xs text-red-400 hover:text-red-300"
+                          onClick={() => handleDelete(user.id, user.name)}
+                        >
+                          削除
+                        </Button>
+                      </div>
+                    </td>
+                  </>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
