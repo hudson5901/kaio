@@ -14,32 +14,10 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog";
-import { Download } from "lucide-react";
+import { Download, RefreshCw } from "lucide-react";
 import { mapItemToEbayListing, type EbayListingData } from "@/lib/ebay/mapping";
 import { validateEbayListing, type ValidationResult } from "@/lib/ebay/validation";
 import { downloadEbayDraftCsv } from "@/lib/ebay/draft-csv";
-
-const statusLabels: Record<string, string> = {
-  available: "在庫あり",
-  sold: "売り切れ",
-  deleted: "削除済み",
-  draft: "下書き",
-  listed: "出品中",
-  removed: "取り下げ",
-};
-
-const statusColors: Record<string, string> = {
-  available: "bg-emerald-500",
-  sold: "bg-red-400",
-  deleted: "bg-zinc-500",
-  draft: "bg-zinc-400",
-  listed: "bg-blue-400",
-  removed: "bg-zinc-500",
-};
-
-function StatusDot({ status }: { status: string }) {
-  return <span className={`inline-block w-[6px] h-[6px] rounded-full ${statusColors[status] || "bg-zinc-400"}`} />;
-}
 
 interface ValidationEntry {
   item: Item;
@@ -66,6 +44,9 @@ export default function EbayListingPage() {
   const [validListings, setValidListings] = useState<EbayListingData[]>([]);
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [syncing, setSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   useEffect(() => {
     fetch("/api/items")
@@ -105,8 +86,14 @@ export default function EbayListingPage() {
     }
   }
 
+  const filteredItems = useMemo(() => {
+    if (statusFilter === "all") return items;
+    if (statusFilter === "checked") return items.filter((i) => !!i.listingScheduledAt);
+    return items.filter((i) => i.ebayStatus === statusFilter);
+  }, [items, statusFilter]);
+
   const sortedItems = useMemo(() => {
-    if (!sortKey) return items;
+    if (!sortKey) return filteredItems;
     const getValue = (item: Item): number | string => {
       switch (sortKey) {
         case "title": return item.mercariTitle || "";
@@ -117,13 +104,13 @@ export default function EbayListingPage() {
         case "ai": return item.aiScore || 0;
       }
     };
-    return [...items].sort((a, b) => {
+    return [...filteredItems].sort((a, b) => {
       const va = getValue(a);
       const vb = getValue(b);
       const cmp = typeof va === "string" ? va.localeCompare(vb as string) : (va as number) - (vb as number);
       return sortDir === "asc" ? cmp : -cmp;
     });
-  }, [items, sortKey, sortDir]);
+  }, [filteredItems, sortKey, sortDir]);
 
   // フィルタ済みIDをsessionStorageに保存（詳細ページの前後ナビで使用）
   useEffect(() => {
@@ -164,6 +151,34 @@ export default function EbayListingPage() {
     setShowValidation(false);
   }
 
+  async function handleEbaySync() {
+    setSyncing(true);
+    setSyncMessage(null);
+    try {
+      const res = await fetch("/api/ebay/import", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        setSyncMessage({ type: "error", text: data.message || data.error || "同期に失敗しました" });
+        return;
+      }
+      setSyncMessage({
+        type: "success",
+        text: `${data.imported}件インポート、${data.updated}件更新、${data.soldMarked}件売約済み`,
+      });
+      // リスト再取得
+      const itemsRes = await fetch("/api/items");
+      const itemsData = await itemsRes.json();
+      if (Array.isArray(itemsData)) {
+        setItems(itemsData.filter((i: Item) => i.decision === "list"));
+      }
+    } catch {
+      setSyncMessage({ type: "error", text: "eBay同期中にエラーが発生しました" });
+    } finally {
+      setSyncing(false);
+      setTimeout(() => setSyncMessage(null), 5000);
+    }
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
@@ -173,17 +188,72 @@ export default function EbayListingPage() {
             「出品」判定のアイテム <span className="font-medium text-foreground">{items.length}</span>件
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          className="gap-1.5 text-[12px] h-8"
-          onClick={handleCsvExport}
-          disabled={items.length === 0}
-        >
-          <Download className="w-3.5 h-3.5" />
-          CSV出力{selected.size > 0 ? ` (${selected.size}件)` : ""}
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 text-[12px] h-8"
+            onClick={handleEbaySync}
+            disabled={syncing}
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${syncing ? "animate-spin" : ""}`} />
+            {syncing ? "同期中..." : "eBay同期"}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 text-[12px] h-8"
+            onClick={handleCsvExport}
+            disabled={items.length === 0}
+          >
+            <Download className="w-3.5 h-3.5" />
+            CSV出力{selected.size > 0 ? ` (${selected.size}件)` : ""}
+          </Button>
+        </div>
       </div>
+
+      {/* Sync message toast */}
+      {syncMessage && (
+        <div
+          className={`rounded-lg px-4 py-2.5 text-[13px] font-medium animate-in slide-in-from-top-2 ${
+            syncMessage.type === "success"
+              ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20"
+              : "bg-red-500/10 text-red-600 border border-red-500/20"
+          }`}
+        >
+          {syncMessage.text}
+        </div>
+      )}
+
+      {/* Status filter tabs */}
+      {(() => {
+        const checkedCount = items.filter((i) => !!i.listingScheduledAt).length;
+        const draftCount = items.filter((i) => i.ebayStatus === "draft").length;
+        const listedCount = items.filter((i) => i.ebayStatus === "listed").length;
+        const filters = [
+          { key: "all", label: "すべて", count: items.length },
+          { key: "checked", label: "チェック済", count: checkedCount },
+          { key: "draft", label: "下書き", count: draftCount },
+          { key: "listed", label: "出品中", count: listedCount },
+        ];
+        return (
+          <div className="flex gap-1 border-b border-border/60 -mb-2">
+            {filters.map((f) => (
+              <button
+                key={f.key}
+                onClick={() => setStatusFilter(f.key)}
+                className={`px-3 py-2 text-[12px] font-medium border-b-2 transition-colors ${
+                  statusFilter === f.key
+                    ? "border-primary text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {f.label} <span className="text-muted-foreground/60 ml-0.5">{f.count}</span>
+              </button>
+            ))}
+          </div>
+        );
+      })()}
 
       {/* Selection bar */}
       {selected.size > 0 && (
@@ -214,7 +284,7 @@ export default function EbayListingPage() {
       ) : (
         <div className="border border-border/60 rounded-lg overflow-x-auto">
           {/* Table header */}
-          <div className="grid grid-cols-[32px_36px_1fr_80px_80px_80px_80px_80px_60px] gap-0 px-3 py-2.5 border-b border-border/60 text-[11px] font-medium text-muted-foreground/70 uppercase tracking-wider bg-accent/30">
+          <div className="grid grid-cols-[32px_36px_1fr_80px_80px_80px_80px_60px_50px] gap-0 px-3 py-2.5 border-b border-border/60 text-[11px] font-medium text-muted-foreground/70 uppercase tracking-wider bg-accent/30">
             <span className="flex items-center">
               <button
                 onClick={toggleSelectAll}
@@ -235,19 +305,19 @@ export default function EbayListingPage() {
             <button onClick={() => toggleSort("ebayPrice")} className="group flex items-center gap-0.5 justify-end">eBay価格 <SortIcon active={sortKey === "ebayPrice"} dir={sortDir} /></button>
             <button onClick={() => toggleSort("shipping")} className="group flex items-center gap-0.5 justify-end">送料 <SortIcon active={sortKey === "shipping"} dir={sortDir} /></button>
             <button onClick={() => toggleSort("profit")} className="group flex items-center gap-0.5 justify-end">利益 <SortIcon active={sortKey === "profit"} dir={sortDir} /></button>
-            <span>eBay</span>
+            <span className="text-center">確認</span>
             <button onClick={() => toggleSort("ai")} className="group flex items-center gap-0.5 justify-end">AI <SortIcon active={sortKey === "ai"} dir={sortDir} /></button>
           </div>
           {/* Table rows */}
           <div>
             {sortedItems.map((item, index) => {
               let images: string[] = [];
-              try { images = item.mercariImages ? JSON.parse(item.mercariImages) : []; } catch { /* ignore */ }
+              try { images = item.processedImages ? JSON.parse(item.processedImages) : item.mercariImages ? JSON.parse(item.mercariImages) : []; } catch { /* ignore */ }
               const isSelected = selected.has(item.id);
               return (
                 <div
                   key={item.id}
-                  className={`grid grid-cols-[32px_36px_1fr_80px_80px_80px_80px_80px_60px] gap-0 px-3 py-2 items-center transition-colors ${
+                  className={`grid grid-cols-[32px_36px_1fr_80px_80px_80px_80px_60px_50px] gap-0 px-3 py-2 items-center transition-colors ${
                     isSelected ? "bg-accent/60" : "hover:bg-accent/40"
                   } ${index > 0 ? "border-t border-border/30" : ""}`}
                 >
@@ -281,11 +351,16 @@ export default function EbayListingPage() {
                   <span className={`text-[13px] text-right tabular-nums font-medium ${item.estimatedProfitUsd && item.estimatedProfitUsd > 0 ? "text-emerald-500" : item.estimatedProfitUsd ? "text-red-400" : ""}`}>
                     {item.estimatedProfitUsd != null ? `$${item.estimatedProfitUsd.toFixed(0)}` : <span className="text-muted-foreground/30">--</span>}
                   </span>
-                  <div>
-                    <span className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                      <StatusDot status={item.ebayStatus} />
-                      {statusLabels[item.ebayStatus]}
-                    </span>
+                  <div className="flex justify-center">
+                    {item.listingScheduledAt ? (
+                      <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500/15 text-emerald-500">
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                        </svg>
+                      </span>
+                    ) : (
+                      <span className="text-[11px] text-muted-foreground/40">--</span>
+                    )}
                   </div>
                   <span className={`text-[12px] text-right tabular-nums font-medium ${item.aiScore != null && item.aiScore >= 70 ? "text-emerald-500" : item.aiScore != null && item.aiScore >= 40 ? "text-amber-500" : item.aiScore != null ? "text-red-400" : ""}`}>
                     {item.aiScore != null ? item.aiScore : <span className="text-muted-foreground/30">--</span>}

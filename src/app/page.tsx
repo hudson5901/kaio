@@ -205,7 +205,7 @@ export default function Dashboard() {
   }
 
   const unreadCount = notifications.filter((n) => !n.read).length;
-  const recentItems = items.slice(0, 8);
+  const recentItems = items.filter(i => i.decision === "list").slice(0, 8);
 
   const listItems = items.filter(i => i.decision === "list");
   const pipelineStages = [
@@ -484,7 +484,7 @@ export default function Dashboard() {
         ) : (
           <div className="border border-border/60 rounded-lg overflow-hidden">
             {recentItems.map((item, index) => {
-              let images: string[] = []; try { images = item.mercariImages ? JSON.parse(item.mercariImages) : []; } catch { /* ignore */ }
+              let images: string[] = []; try { images = item.processedImages ? JSON.parse(item.processedImages) : item.mercariImages ? JSON.parse(item.mercariImages) : []; } catch { /* ignore */ }
               return (
                 <Link
                   key={item.id}

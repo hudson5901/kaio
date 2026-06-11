@@ -369,7 +369,7 @@ export default function ItemsPage() {
         /* Grid View */
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {paged.map((item) => {
-            let images: string[] = []; try { images = item.mercariImages ? JSON.parse(item.mercariImages) : []; } catch { /* ignore */ }
+            let images: string[] = []; try { images = item.processedImages ? JSON.parse(item.processedImages) : item.mercariImages ? JSON.parse(item.mercariImages) : []; } catch { /* ignore */ }
             const isSelected = selected.has(item.id);
             return (
               <div key={item.id} className="group relative">
@@ -481,7 +481,7 @@ export default function ItemsPage() {
           {/* Table rows */}
           <div>
             {paged.map((item, index) => {
-              let images: string[] = []; try { images = item.mercariImages ? JSON.parse(item.mercariImages) : []; } catch { /* ignore */ }
+              let images: string[] = []; try { images = item.processedImages ? JSON.parse(item.processedImages) : item.mercariImages ? JSON.parse(item.mercariImages) : []; } catch { /* ignore */ }
               const isSelected = selected.has(item.id);
               return (
                 <div
