@@ -742,25 +742,28 @@ export async function scrapeMercari(
 
 /**
  * 単一アイテムのメルカリ在庫状態を確認
+ * エラー時は "unknown" を返す（呼び出し側でスキップ判断）
  */
 export async function checkMercariAvailability(
   mercariId: string
-): Promise<"available" | "sold" | "deleted"> {
+): Promise<"available" | "sold" | "deleted" | "unknown"> {
   try {
     const url = `https://jp.mercari.com/item/${mercariId}`;
     const markdown = await fetchWithJina(url);
 
-    if (markdown.includes("この商品は存在しません") || markdown.includes("404")) {
+    // 削除チェック: ページ自体が存在しない
+    if (markdown.includes("この商品は存在しません") || markdown.includes("ページが見つかりません")) {
       return "deleted";
     }
 
-    if (/売り切れ|SOLD OUT|この商品は売り切れです/i.test(markdown)) {
+    // 売り切れチェック
+    if (/売り切れ|SOLD\s*OUT|この商品は売り切れです/i.test(markdown)) {
       return "sold";
     }
 
     return "available";
-  } catch {
-    // ネットワークエラー時はステータス変更しない（availableのまま）
-    return "available";
+  } catch (err) {
+    console.error(`[checkMercariAvailability] ${mercariId}: ${err}`);
+    return "unknown";
   }
 }

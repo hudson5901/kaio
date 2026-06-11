@@ -6,7 +6,7 @@ function makeListing(overrides: Partial<EbayListingData> = {}): EbayListingData 
   return {
     sku: "KAIO-TEST123",
     title: "Japanese Samurai Kabuto Helmet",
-    description: "Test description",
+    description: "Test description for eBay listing validation",
     categoryId: "11644",
     conditionString: "USED_EXCELLENT",
     conditionId: 3000,

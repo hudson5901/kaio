@@ -1,13 +1,17 @@
 /**
  * アプリ内定期実行スケジューラー
  * Next.js のサーバーサイドで動作し、定期的に在庫同期を実行する
+ *
+ * 注意: Vercel等サーバーレス環境ではsetIntervalは永続化されません。
+ * ローカル開発 or VPS での使用を想定。
  */
+import { runSyncBatch } from "@/lib/sync";
 
 let intervalId: ReturnType<typeof setInterval> | null = null;
 let lastRun: string | null = null;
 let nextRun: string | null = null;
 let isRunning = false;
-let intervalMinutes = 60; // デフォルト1時間
+let intervalMinutes = 60;
 
 export interface SchedulerState {
   active: boolean;
@@ -17,80 +21,32 @@ export interface SchedulerState {
   isRunning: boolean;
 }
 
-async function runSync() {
+/**
+ * 全件を20件バッチで順次処理
+ */
+async function runFullSync() {
   if (isRunning) return;
   isRunning = true;
 
   try {
     console.log(`[スケジューラー] 在庫同期開始 ${new Date().toISOString()}`);
 
-    // DB直接アクセスで同期処理を実行
-    const { db, schema } = await import("@/lib/db");
-    const { eq, and, ne } = await import("drizzle-orm");
-    const { checkMercariAvailability } = await import("@/lib/mercari/scraper");
-    const { removeEbayListing } = await import("@/lib/ebay/inventory");
-    const { v4: uuid } = await import("uuid");
+    let totalChecked = 0;
+    let totalSold = 0;
+    let totalDeleted = 0;
+    let hasMore = true;
 
-    const activeItems = await db
-      .select()
-      .from(schema.items)
-      .where(
-        and(
-          eq(schema.items.mercariStatus, "available"),
-          ne(schema.items.ebayStatus, "removed")
-        )
-      );
-
-    let soldCount = 0;
-    let deletedCount = 0;
-
-    for (const item of activeItems) {
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      const status = await checkMercariAvailability(item.mercariId!);
-
-      if (status !== "available") {
-        await db
-          .update(schema.items)
-          .set({
-            mercariStatus: status,
-            updatedAt: new Date().toISOString(),
-          })
-          .where(eq(schema.items.id, item.id));
-
-        if (status === "sold") {
-          soldCount++;
-          await db.insert(schema.notifications).values({
-            id: uuid(),
-            type: "sold",
-            title: "メルカリで売り切れ",
-            message: `「${item.mercariTitle}」(¥${item.mercariPrice.toLocaleString()}) がメルカリで売り切れました`,
-            itemId: item.id,
-          });
-        } else {
-          deletedCount++;
-          await db.insert(schema.notifications).values({
-            id: uuid(),
-            type: "deleted",
-            title: "メルカリから削除",
-            message: `「${item.mercariTitle}」がメルカリから削除されました`,
-            itemId: item.id,
-          });
-        }
-
-        if (item.ebayStatus === "listed") {
-          try {
-            await removeEbayListing(item);
-          } catch (err) {
-            console.error(`[スケジューラー] eBay取り下げ失敗: ${err}`);
-          }
-        }
-      }
+    while (hasMore) {
+      const result = await runSyncBatch(20);
+      totalChecked += result.checked;
+      totalSold += result.soldOnMercari;
+      totalDeleted += result.deletedOnMercari;
+      hasMore = result.hasMore;
     }
 
     lastRun = new Date().toISOString();
     console.log(
-      `[スケジューラー] 同期完了: ${activeItems.length}件チェック, 売り切れ${soldCount}件, 削除${deletedCount}件`
+      `[スケジューラー] 同期完了: ${totalChecked}件チェック, 売り切れ${totalSold}件, 削除${totalDeleted}件`
     );
   } catch (err) {
     console.error(`[スケジューラー] エラー:`, err);
@@ -107,12 +63,11 @@ async function runSync() {
 }
 
 export function startScheduler(minutes?: number) {
-  if (intervalId) return; // Already running
-
+  if (intervalId) return;
   if (minutes) intervalMinutes = minutes;
 
   nextRun = new Date(Date.now() + intervalMinutes * 60 * 1000).toISOString();
-  intervalId = setInterval(runSync, intervalMinutes * 60 * 1000);
+  intervalId = setInterval(runFullSync, intervalMinutes * 60 * 1000);
 
   console.log(`[スケジューラー] 開始: ${intervalMinutes}分間隔`);
 }
@@ -136,6 +91,7 @@ export function getSchedulerState(): SchedulerState {
   };
 }
 
-export function runSyncNow() {
-  runSync();
+export async function runSyncNow() {
+  // await して完了を待つ（fire-and-forget しない）
+  await runFullSync();
 }

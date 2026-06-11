@@ -1,16 +1,15 @@
 import { NextResponse } from "next/server";
 import { db, schema } from "@/lib/db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, inArray } from "drizzle-orm";
 
 /**
  * GET /api/notifications - 通知一覧取得
- * ?unread=true で未読のみ
- * ?limit=20 で取得件数制限
  */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const unreadOnly = searchParams.get("unread") === "true";
-  const limit = Math.min(parseInt(searchParams.get("limit") || "50"), 100);
+  const rawLimit = parseInt(searchParams.get("limit") || "50");
+  const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 100) : 50;
 
   const notifications = unreadOnly
     ? await db
@@ -30,10 +29,14 @@ export async function GET(request: Request) {
 
 /**
  * PATCH /api/notifications - 既読にする
- * { ids: ["id1", "id2"] } or { all: true }
  */
 export async function PATCH(request: Request) {
-  const body = await request.json();
+  let body: Record<string, unknown>;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
 
   if (body.all) {
     await db
@@ -43,13 +46,11 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ ok: true });
   }
 
-  if (body.ids && Array.isArray(body.ids)) {
-    for (const id of body.ids) {
-      await db
-        .update(schema.notifications)
-        .set({ read: true })
-        .where(eq(schema.notifications.id, id));
-    }
+  if (Array.isArray(body.ids) && body.ids.length > 0) {
+    await db
+      .update(schema.notifications)
+      .set({ read: true })
+      .where(inArray(schema.notifications.id, body.ids as string[]));
     return NextResponse.json({ ok: true });
   }
 
@@ -58,10 +59,14 @@ export async function PATCH(request: Request) {
 
 /**
  * DELETE /api/notifications - 通知を削除
- * { ids: ["id1"] } or { all: true } (既読のみ削除)
  */
 export async function DELETE(request: Request) {
-  const body = await request.json();
+  let body: Record<string, unknown>;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
 
   if (body.all) {
     await db
@@ -70,12 +75,10 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ ok: true });
   }
 
-  if (body.ids && Array.isArray(body.ids)) {
-    for (const id of body.ids) {
-      await db
-        .delete(schema.notifications)
-        .where(eq(schema.notifications.id, id));
-    }
+  if (Array.isArray(body.ids) && body.ids.length > 0) {
+    await db
+      .delete(schema.notifications)
+      .where(inArray(schema.notifications.id, body.ids as string[]));
     return NextResponse.json({ ok: true });
   }
 

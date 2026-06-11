@@ -93,14 +93,15 @@ export default function Dashboard() {
     const res = await fetch("/api/items");
     const data: Item[] = await res.json();
     setItems(data);
+    const listItems = data.filter((i) => i.decision === "list");
     setStats({
-      total: data.length,
-      available: data.filter((i) => i.mercariStatus === "available").length,
-      listed: data.filter((i) => i.ebayStatus === "listed").length,
-      sold: data.filter((i) => i.ebayStatus === "sold").length,
-      draft: data.filter((i) => i.ebayStatus === "draft").length,
-      totalProfit: data.reduce((sum, i) => sum + (i.estimatedProfitUsd || 0), 0),
-      totalInvestment: data.reduce((sum, i) => sum + (i.mercariPrice || 0), 0),
+      total: listItems.length,
+      available: listItems.filter((i) => i.mercariStatus === "available").length,
+      listed: listItems.filter((i) => i.ebayStatus === "listed").length,
+      sold: listItems.filter((i) => i.ebayStatus === "sold").length,
+      draft: listItems.filter((i) => i.ebayStatus === "draft").length,
+      totalProfit: listItems.reduce((sum, i) => sum + (i.estimatedProfitUsd || 0), 0),
+      totalInvestment: listItems.reduce((sum, i) => sum + (i.mercariPrice || 0), 0),
     });
   }, []);
 
@@ -145,10 +146,19 @@ export default function Dashboard() {
 
   async function handleSync() {
     setSyncing(true);
+    let totalChecked = 0, totalSold = 0, totalRemoved = 0;
     try {
-      const res = await fetch("/api/sync", { method: "POST" });
-      const result = await res.json();
-      alert(`同期完了: ${result.checked}件チェック, ${result.soldOnMercari}件売り切れ, ${result.removedFromEbay}件eBay削除`);
+      let hasMore = true;
+      while (hasMore) {
+        const res = await fetch("/api/sync", { method: "POST" });
+        if (!res.ok) { alert("同期に失敗しました"); break; }
+        const result = await res.json();
+        totalChecked += result.checked;
+        totalSold += result.soldOnMercari;
+        totalRemoved += result.removedFromEbay;
+        hasMore = result.hasMore;
+      }
+      alert(`同期完了: ${totalChecked}件チェック, ${totalSold}件売り切れ, ${totalRemoved}件eBay削除`);
       fetchItems();
       fetchNotifications();
     } catch { alert("同期に失敗しました"); }
@@ -197,11 +207,12 @@ export default function Dashboard() {
   const unreadCount = notifications.filter((n) => !n.read).length;
   const recentItems = items.slice(0, 8);
 
+  const listItems = items.filter(i => i.decision === "list");
   const pipelineStages = [
-    { label: "仕入れ済み", count: stats.total, color: "text-foreground" },
-    { label: "画像処理待ち", count: items.filter(i => !i.processedImages && i.mercariStatus === "available").length, color: "text-amber-400" },
-    { label: "出品待ち", count: stats.draft, color: "text-blue-400" },
-    { label: "出品中", count: stats.listed, color: "text-emerald-400" },
+    { label: "出品判定", count: listItems.length, color: "text-foreground" },
+    { label: "画像処理待ち", count: listItems.filter(i => !i.processedImages).length, color: "text-amber-400" },
+    { label: "出品待ち", count: listItems.filter(i => i.ebayStatus === "draft").length, color: "text-blue-400" },
+    { label: "出品中", count: listItems.filter(i => i.ebayStatus === "listed").length, color: "text-emerald-400" },
   ];
 
   return (

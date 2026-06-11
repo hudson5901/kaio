@@ -47,6 +47,16 @@ interface ValidationEntry {
   result: ValidationResult;
 }
 
+type SortKey = "title" | "mercariPrice" | "ebayPrice" | "shipping" | "profit" | "ai";
+type SortDir = "asc" | "desc";
+
+function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
+  if (!active) return <svg className="w-3 h-3 opacity-0 group-hover:opacity-40 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8.25 15 12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" /></svg>;
+  return dir === "asc"
+    ? <svg className="w-3 h-3 text-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>
+    : <svg className="w-3 h-3 text-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>;
+}
+
 export default function EbayListingPage() {
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,6 +64,8 @@ export default function EbayListingPage() {
   const [showValidation, setShowValidation] = useState(false);
   const [validationEntries, setValidationEntries] = useState<ValidationEntry[]>([]);
   const [validListings, setValidListings] = useState<EbayListingData[]>([]);
+  const [sortKey, setSortKey] = useState<SortKey | null>(null);
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
 
   useEffect(() => {
     fetch("/api/items")
@@ -66,13 +78,6 @@ export default function EbayListingPage() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
-
-  // フィルタ済みIDをsessionStorageに保存（詳細ページの前後ナビで使用）
-  useEffect(() => {
-    try {
-      sessionStorage.setItem("kaio-filtered-ids", JSON.stringify(items.map((i) => i.id)));
-    } catch { /* ignore */ }
-  }, [items]);
 
   function toggleSelect(id: string) {
     setSelected((prev) => {
@@ -90,6 +95,42 @@ export default function EbayListingPage() {
       setSelected(new Set(items.map((i) => i.id)));
     }
   }
+
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("desc");
+    }
+  }
+
+  const sortedItems = useMemo(() => {
+    if (!sortKey) return items;
+    const getValue = (item: Item): number | string => {
+      switch (sortKey) {
+        case "title": return item.mercariTitle || "";
+        case "mercariPrice": return item.mercariPrice || 0;
+        case "ebayPrice": return item.ebayPriceUsd || 0;
+        case "shipping": return item.shippingCostUsd || 0;
+        case "profit": return item.estimatedProfitUsd || 0;
+        case "ai": return item.aiScore || 0;
+      }
+    };
+    return [...items].sort((a, b) => {
+      const va = getValue(a);
+      const vb = getValue(b);
+      const cmp = typeof va === "string" ? va.localeCompare(vb as string) : (va as number) - (vb as number);
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+  }, [items, sortKey, sortDir]);
+
+  // フィルタ済みIDをsessionStorageに保存（詳細ページの前後ナビで使用）
+  useEffect(() => {
+    try {
+      sessionStorage.setItem("kaio-filtered-ids", JSON.stringify(sortedItems.map((i) => i.id)));
+    } catch { /* ignore */ }
+  }, [sortedItems]);
 
   function handleCsvExport() {
     const targetItems = selected.size > 0
@@ -189,17 +230,17 @@ export default function EbayListingPage() {
               </button>
             </span>
             <span></span>
-            <span>商品名</span>
-            <span className="text-right">仕入れ</span>
-            <span className="text-right">eBay価格</span>
-            <span className="text-right">送料</span>
-            <span className="text-right">利益</span>
+            <button onClick={() => toggleSort("title")} className="group flex items-center gap-1 text-left">商品名 <SortIcon active={sortKey === "title"} dir={sortDir} /></button>
+            <button onClick={() => toggleSort("mercariPrice")} className="group flex items-center gap-0.5 justify-end">仕入れ <SortIcon active={sortKey === "mercariPrice"} dir={sortDir} /></button>
+            <button onClick={() => toggleSort("ebayPrice")} className="group flex items-center gap-0.5 justify-end">eBay価格 <SortIcon active={sortKey === "ebayPrice"} dir={sortDir} /></button>
+            <button onClick={() => toggleSort("shipping")} className="group flex items-center gap-0.5 justify-end">送料 <SortIcon active={sortKey === "shipping"} dir={sortDir} /></button>
+            <button onClick={() => toggleSort("profit")} className="group flex items-center gap-0.5 justify-end">利益 <SortIcon active={sortKey === "profit"} dir={sortDir} /></button>
             <span>eBay</span>
-            <span className="text-right">AI</span>
+            <button onClick={() => toggleSort("ai")} className="group flex items-center gap-0.5 justify-end">AI <SortIcon active={sortKey === "ai"} dir={sortDir} /></button>
           </div>
           {/* Table rows */}
           <div>
-            {items.map((item, index) => {
+            {sortedItems.map((item, index) => {
               let images: string[] = [];
               try { images = item.mercariImages ? JSON.parse(item.mercariImages) : []; } catch { /* ignore */ }
               const isSelected = selected.has(item.id);

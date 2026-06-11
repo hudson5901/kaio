@@ -6,7 +6,7 @@ function makeListing(overrides: Partial<EbayListingData> = {}): EbayListingData 
   return {
     sku: "KAIO-TEST123",
     title: "Japanese Samurai Kabuto Helmet",
-    description: "Test description",
+    description: "Test description for eBay listing",
     categoryId: "11644",
     conditionString: "USED_EXCELLENT",
     conditionId: 3000,
@@ -112,11 +112,11 @@ describe("generateEbayDraftCsv", () => {
     expect(csv).not.toContain("<p><p>");
   });
 
-  it("outputs Add as action", () => {
+  it("outputs Draft as action", () => {
     const csv = generateEbayDraftCsv([makeListing()]);
     const lines = csv.split("\r\n");
     const dataRow = lines[1];
-    expect(dataRow.startsWith("Add,")).toBe(true);
+    expect(dataRow.startsWith("Draft,")).toBe(true);
   });
 
   it("outputs correct SKU", () => {

@@ -31,9 +31,11 @@ export default function NotificationsPage() {
 
   async function fetchNotifications() {
     setLoading(true);
-    const res = await fetch("/api/notifications?limit=100");
-    if (res.ok) setNotifications(await res.json());
-    setLoading(false);
+    try {
+      const res = await fetch("/api/notifications?limit=100");
+      if (res.ok) setNotifications(await res.json());
+    } catch { /* network error */ }
+    finally { setLoading(false); }
   }
 
   async function markAllRead() {

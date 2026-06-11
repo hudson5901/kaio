@@ -23,36 +23,17 @@ function StatusDot({ status }: { status: string }) {
   return <span className={`inline-block w-2 h-2 rounded-full ${statusColors[status] || "bg-zinc-400"}`} />;
 }
 
-function CheckAvatar({
-  label,
-  checked,
-  interactive,
-  loading,
-  onClick,
-  title,
-}: {
-  label: string;
-  checked: boolean;
-  interactive?: boolean;
-  loading?: boolean;
-  onClick?: () => void;
-  title?: string;
-}) {
-  const base = "w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-semibold border transition-colors select-none";
-  const cls = checked
-    ? "bg-emerald-500/20 border-emerald-500 text-emerald-300"
-    : "bg-muted/40 border-border text-muted-foreground/60";
-  const hover = interactive ? " cursor-pointer hover:border-emerald-400 hover:text-foreground" : " cursor-default";
+function CheckBox({ checked, loading }: { checked: boolean; loading?: boolean }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={!interactive || loading}
-      title={title}
-      className={`${base} ${cls}${hover} ${loading ? "opacity-50" : ""}`}
-    >
-      {label}
-    </button>
+    <span className={`w-4.5 h-4.5 rounded flex items-center justify-center border transition-colors flex-shrink-0 ${
+      checked ? "bg-emerald-500 border-emerald-500 text-white" : "border-muted-foreground/40 bg-transparent"
+    } ${loading ? "opacity-50" : ""}`}>
+      {checked && (
+        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+        </svg>
+      )}
+    </span>
   );
 }
 
@@ -146,7 +127,7 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [adjacentItems, router, item]);
+  }, [adjacentItems, router, item, navQuery]);
 
   async function fetchAdjacentItems() {
     try {
@@ -938,48 +919,82 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
             }
           }
 
+          const aiOkCount = checks.filter(({ ok }) => ok).length;
+          const myCheckedCount = currentUser ? checks.filter(({ key }) => staffChecks[key]?.[currentUser.id]).length : 0;
+          const otherUser = staffUsers.find((u) => u.id !== currentUser?.id);
+          const otherCheckedCount = otherUser ? checks.filter(({ key }) => staffChecks[key]?.[otherUser.id]).length : 0;
+          const allComplete = !!item.listingScheduledAt;
+
           return (
-            <div className="rounded-xl bg-card border border-border overflow-hidden">
-              <div className="px-4 py-2.5 border-b border-border bg-muted/30 flex items-center justify-between gap-3">
-                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">出品準備チェック</h3>
-                {item.listingScheduledAt && (
-                  <span className="text-[11px] text-emerald-400 tabular-nums">
-                    全員確認済 ・ 出品予定 {item.listingScheduledAt}
+            <div className={`rounded-xl bg-card border overflow-hidden ${allComplete ? "border-emerald-500/40" : "border-border"}`}>
+              <div className="px-4 py-2.5 border-b border-border bg-muted/30">
+                <div className="flex items-center justify-between gap-3 mb-2">
+                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">出品準備チェック</h3>
+                </div>
+                {/* 3名のチェック進捗 */}
+                <div className="flex items-center gap-4 text-[11px]">
+                  <span className={`flex items-center gap-1.5 ${aiOkCount === checks.length ? "text-emerald-400" : "text-muted-foreground"}`}>
+                    <span className={`w-2 h-2 rounded-full ${aiOkCount === checks.length ? "bg-emerald-400" : "bg-muted-foreground/40"}`} />
+                    AI {aiOkCount}/{checks.length}
                   </span>
-                )}
+                  <span className={`flex items-center gap-1.5 ${myCheckedCount === checks.length ? "text-emerald-400" : "text-muted-foreground"}`}>
+                    <span className={`w-2 h-2 rounded-full ${myCheckedCount === checks.length ? "bg-emerald-400" : "bg-muted-foreground/40"}`} />
+                    {currentUser?.name?.charAt(0) || "自分"} {myCheckedCount}/{checks.length}
+                  </span>
+                  {otherUser && (
+                    <span className={`flex items-center gap-1.5 ${otherCheckedCount === checks.length ? "text-emerald-400" : "text-muted-foreground"}`}>
+                      <span className={`w-2 h-2 rounded-full ${otherCheckedCount === checks.length ? "bg-emerald-400" : "bg-muted-foreground/40"}`} />
+                      {otherUser.name.charAt(0)} {otherCheckedCount}/{checks.length}
+                    </span>
+                  )}
+                </div>
               </div>
-              <div className="px-4 py-3 flex flex-col gap-2">
-                {checks.map(({ key, ok, label }) => (
-                  <div key={key} className={`flex items-center justify-between gap-3 text-xs px-3 py-2 rounded-lg border ${ok ? "border-emerald-500/30 bg-emerald-500/10" : "border-border bg-muted/30"}`}>
-                    <div className={`flex items-center gap-2 ${ok ? "text-emerald-400" : "text-muted-foreground"}`}>
-                      {ok ? (
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
-                      ) : (
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" /></svg>
-                      )}
-                      {label}
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <CheckAvatar label="AI" checked={ok} title={ok ? "AIチェック済" : "AI未確認"} />
-                      {staffUsers.map((u) => {
-                        const checkedAt = staffChecks[key]?.[u.id];
-                        const isSelf = currentUser?.id === u.id;
-                        return (
-                          <CheckAvatar
-                            key={u.id}
-                            label={u.name.charAt(0)}
-                            checked={!!checkedAt}
-                            interactive={isSelf}
-                            loading={togglingCheck === `${key}:${u.id}`}
-                            onClick={isSelf ? () => toggleCheck(key) : undefined}
-                            title={`${u.name}${checkedAt ? ` ・ ${new Date(checkedAt).toLocaleString("ja-JP")}` : isSelf ? " (クリックで確認)" : " 未確認"}`}
-                          />
-                        );
-                      })}
-                    </div>
+              <div className="divide-y divide-border/40">
+                {checks.map(({ key, ok, label }) => {
+                  const myCheck = currentUser ? staffChecks[key]?.[currentUser.id] : null;
+                  const otherCheck = otherUser ? staffChecks[key]?.[otherUser.id] : null;
+                  const isLoading = currentUser ? togglingCheck === `${key}:${currentUser.id}` : false;
+
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => currentUser && toggleCheck(key)}
+                      disabled={!currentUser || isLoading}
+                      className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-accent/40 ${isLoading ? "opacity-50" : ""}`}
+                    >
+                      <CheckBox checked={!!myCheck} loading={isLoading} />
+                      <span className={`text-[13px] flex-1 ${myCheck ? "text-foreground" : "text-muted-foreground"}`}>
+                        {label}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        {!ok && (
+                          <span className="text-[10px] text-amber-400/80 bg-amber-400/10 px-1.5 py-0.5 rounded">未設定</span>
+                        )}
+                        {ok && (
+                          <span className="text-[10px] text-emerald-400/70">AI✓</span>
+                        )}
+                        {otherCheck && (
+                          <span className="text-[10px] text-emerald-400/70">{otherUser?.name.charAt(0)}✓</span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+              {/* 全チェック完了 → 出品予定日 */}
+              {allComplete && (
+                <div className="px-4 py-3 border-t border-emerald-500/30 bg-emerald-500/5 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 text-emerald-400">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
+                    <span className="text-[13px] font-medium">3名確認済み</span>
                   </div>
-                ))}
-              </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] text-muted-foreground">出品予定日</span>
+                    <span className="text-[13px] font-semibold text-emerald-400 tabular-nums">{item.listingScheduledAt}</span>
+                  </div>
+                </div>
+              )}
             </div>
           );
         })()}
