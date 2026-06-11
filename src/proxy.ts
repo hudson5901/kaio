@@ -13,6 +13,11 @@ export default async function proxy(request: NextRequest) {
     return NextResponse.next({ request });
   }
 
+  // ローカル開発時は認証スキップ
+  if (process.env.NODE_ENV === "development") {
+    return NextResponse.next({ request });
+  }
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 

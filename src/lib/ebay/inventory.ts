@@ -3,8 +3,7 @@ import { getUserToken } from "./client";
 import { db, schema } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import type { Item } from "@/lib/db/schema";
-import { generateEnglishTitle, generateEnglishDescription, parseDimensions } from "@/lib/mercari/parser";
-import { getCategory, type KabutoCategory } from "@/lib/kabuto/categories";
+import { mapItemToEbayListing } from "./mapping";
 
 /**
  * eBay Inventory API でアイテムを出品
@@ -16,77 +15,21 @@ export async function createEbayListing(item: Item): Promise<{
   const token = await getUserToken();
   const baseUrl = getBaseApiUrl();
 
-  // AI生成済みのタイトル・説明文があればそれを使う、なければフォールバック生成
-  let title: string;
-  let engDescription: string;
-  if (item.ebayTitle && item.ebayDescription) {
-    title = item.ebayTitle;
-    engDescription = item.ebayDescription;
-  } else {
-    const description = item.mercariDescription || "";
-    const dimensions = parseDimensions(description);
-    title = generateEnglishTitle(item.mercariTitle, description);
-    engDescription = generateEnglishDescription(item.mercariTitle, description, dimensions);
-  }
-
-  // Item Specifics: DB保存済みのaspects → カテゴリデフォルト → ハードコードフォールバック
-  let aspects: Record<string, string[]> = {
-    Type: ["Kabuto"],
-    "Country/Region of Manufacture": ["Japan"],
-    "Original/Reproduction": ["Original"],
-  };
-
-  if (item.ebayAspects) {
-    try {
-      aspects = JSON.parse(item.ebayAspects);
-    } catch { /* use default */ }
-  } else if (item.kabutoCategory) {
-    const category = getCategory(item.kabutoCategory as KabutoCategory);
-    if (category) {
-      aspects = category.defaultAspects;
-    }
-  }
-
-  // eBayカテゴリID: カテゴリ設定から取得、フォールバックは11644 (Asian Antiques > Japan > Armor)
-  let categoryId = "11644";
-  if (item.kabutoCategory) {
-    const category = getCategory(item.kabutoCategory as KabutoCategory);
-    if (category) {
-      categoryId = category.ebayCategoryId;
-    }
-  }
-
-  // コンディション: カテゴリ設定から取得
-  let condition = "USED_EXCELLENT";
-  if (item.kabutoCategory) {
-    const category = getCategory(item.kabutoCategory as KabutoCategory);
-    if (category) {
-      condition = category.defaultCondition;
-    }
-  }
-
-  // 加工済み画像のURL
-  const processedImages: string[] = item.processedImages
-    ? JSON.parse(item.processedImages)
-    : [];
-
-  // 1. Inventory Item を作成/更新
-  const sku = `KAIO-${item.mercariId}`;
+  const listing = mapItemToEbayListing(item);
+  const sku = listing.sku;
 
   const inventoryItem = {
     availability: {
       shipToLocationAvailability: {
-        quantity: 1,
+        quantity: listing.quantity,
       },
     },
-    condition,
+    condition: listing.conditionString,
     product: {
-      title: title.slice(0, 80),
-      description: engDescription,
-      imageUrls: processedImages.length > 0
-        ? processedImages.filter((p) => p.startsWith("http"))
-        : [],
-      aspects,
+      title: listing.title,
+      description: listing.description,
+      imageUrls: listing.imageUrls,
+      aspects: listing.aspects,
     },
   };
 
@@ -113,9 +56,9 @@ export async function createEbayListing(item: Item): Promise<{
     sku,
     marketplaceId: "EBAY_US",
     format: "FIXED_PRICE",
-    listingDescription: engDescription,
-    availableQuantity: 1,
-    categoryId,
+    listingDescription: listing.description,
+    availableQuantity: listing.quantity,
+    categoryId: listing.categoryId,
     pricingSummary: {
       price: {
         value: String(item.ebayPriceUsd || 0),

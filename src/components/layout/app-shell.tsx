@@ -10,6 +10,7 @@ const pageTitles: Record<string, string> = {
   "/items": "アイテム管理",
   "/tasks": "タスク管理",
   "/notifications": "通知",
+  "/ebay-listing": "eBay出品",
   "/inventory": "在庫管理",
   "/scrape": "スクレイピング",
   "/settings": "設定",

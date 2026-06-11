@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import type { Item } from "@/lib/db/schema";
 import { CommentsSection } from "@/components/comments-section";
 import { checkShouldPass, type PassCheckResult } from "@/lib/kabuto/pass-checker";
@@ -26,6 +26,11 @@ function StatusDot({ status }: { status: string }) {
 export default function ItemDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const from = searchParams.get("from");
+  const backHref = from === "ebay-listing" ? "/ebay-listing" : "/items";
+  const backLabel = from === "ebay-listing" ? "eBay出品" : "アイテム管理";
+  const fromQuery = from ? `?from=${from}` : "";
   const [item, setItem] = useState<Item | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [costs, setCosts] = useState<Record<string, number> | null>(null);
@@ -42,6 +47,7 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
   const [scoring, setScoring] = useState(false);
   const [classifying, setClassifying] = useState(false);
   const [adjacentItems, setAdjacentItems] = useState<{ prev: string | null; next: string | null; currentIndex: number; total: number }>({ prev: null, next: null, currentIndex: 0, total: 0 });
+  const [viewMode, setViewMode] = useState<"judge" | "ebay">("judge");
 
   // パスチェッカー
   const passCheck = useMemo<PassCheckResult | null>(() => {
@@ -76,9 +82,9 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
     function handleKeyDown(e: KeyboardEvent) {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       if (e.key === "ArrowLeft" && adjacentItems.prev) {
-        router.push(`/items/${adjacentItems.prev}`);
+        router.push(`/items/${adjacentItems.prev}${fromQuery}`);
       } else if (e.key === "ArrowRight" && adjacentItems.next) {
-        router.push(`/items/${adjacentItems.next}`);
+        router.push(`/items/${adjacentItems.next}${fromQuery}`);
       } else if (e.key === "1") {
         handleDecision("list");
       } else if (e.key === "2") {
@@ -151,7 +157,7 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
 
     // 判定を設定した場合のみ、短い遅延後に次のアイテムへ自動遷移
     if (newDecision && adjacentItems.next) {
-      setTimeout(() => router.push(`/items/${adjacentItems.next}`), 150);
+      setTimeout(() => router.push(`/items/${adjacentItems.next}${fromQuery}`), 150);
     }
   }
 
@@ -209,7 +215,7 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
   async function handleDelete() {
     if (!confirm("このアイテムを削除しますか?")) return;
     await fetch(`/api/items/${id}`, { method: "DELETE" });
-    window.location.href = "/items";
+    window.location.href = backHref;
   }
 
   async function handleClassify() {
@@ -246,7 +252,7 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
       {/* Breadcrumb + Navigation */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground/70">
-          <Link href="/items" className="hover:text-foreground transition-colors">アイテム管理</Link>
+          <Link href={backHref} className="hover:text-foreground transition-colors">{backLabel}</Link>
           <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>
           <span className="text-muted-foreground truncate max-w-xs">{item.mercariTitle}</span>
         </div>
@@ -259,7 +265,7 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
             </span>
           )}
           <button
-            onClick={() => adjacentItems.prev && router.push(`/items/${adjacentItems.prev}`)}
+            onClick={() => adjacentItems.prev && router.push(`/items/${adjacentItems.prev}${fromQuery}`)}
             disabled={!adjacentItems.prev}
             className="w-8 h-8 rounded-md flex items-center justify-center border border-border/60 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
             title="前のアイテム"
@@ -269,7 +275,7 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
             </svg>
           </button>
           <button
-            onClick={() => adjacentItems.next && router.push(`/items/${adjacentItems.next}`)}
+            onClick={() => adjacentItems.next && router.push(`/items/${adjacentItems.next}${fromQuery}`)}
             disabled={!adjacentItems.next}
             className="w-8 h-8 rounded-md flex items-center justify-center border border-border/60 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
             title="次のアイテム"
@@ -281,6 +287,27 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
         </div>
       </div>
 
+      {/* Mode tabs */}
+      <div className="flex border-b border-border">
+        {([
+          { value: "judge", label: "判定" },
+          { value: "ebay", label: "eBay出品" },
+        ] as const).map(({ value, label }) => (
+          <button
+            key={value}
+            onClick={() => setViewMode(value)}
+            className={`px-3 py-2 text-[13px] font-medium border-b-2 transition-colors -mb-px ${
+              viewMode === value
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {viewMode === "judge" ? (
       <div className="flex flex-col lg:flex-row gap-4 min-w-0">
         {/* Left: Images */}
         <div className="flex-1 min-w-0 space-y-4">
@@ -304,7 +331,7 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
                 </span>
               </div>
             </div>
-            {/* Thumbnails - smoother selection */}
+            {/* Thumbnails */}
             {allImages.length > 1 && (
               <div className="flex gap-1 p-2 overflow-x-auto scrollbar-thin bg-card">
                 {allImages.map((url, i) => (
@@ -818,26 +845,116 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
           </div>
         </div>
       </div>
+      ) : (
+      /* eBay出品 - 最終確認画面 */
+      <div className="space-y-4">
+        {/* Readiness checklist */}
+        <div className="rounded-xl bg-card border border-border overflow-hidden">
+          <div className="px-4 py-2.5 border-b border-border bg-muted/30">
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">出品準備チェック</h3>
+          </div>
+          <div className="px-4 py-3 flex flex-wrap gap-3">
+            {[
+              { ok: processedImages.length > 0, label: `画像加工済み (${processedImages.length}枚)` },
+              { ok: !!item.ebayTitle, label: "タイトル" },
+              { ok: !!item.ebayDescription, label: "説明文" },
+              { ok: !!item.ebayPriceUsd, label: "価格設定" },
+              { ok: !!item.weightG, label: "重量" },
+            ].map(({ ok, label }) => (
+              <div key={label} className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border ${ok ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400" : "border-border bg-muted/30 text-muted-foreground"}`}>
+                {ok ? (
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
+                ) : (
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" /></svg>
+                )}
+                {label}
+              </div>
+            ))}
+          </div>
+        </div>
 
-      {/* eBay Listing Preview */}
-      <EbayPreview
-        item={item}
-        mercariImages={allImages}
-        processedImages={processedImages}
-        previewImage={previewImage}
-        setPreviewImage={setPreviewImage}
-        generating={generating}
-        onGenerate={handleGenerate}
-        editingTitle={editingTitle}
-        setEditingTitle={setEditingTitle}
-        editingDesc={editingDesc}
-        setEditingDesc={setEditingDesc}
-        draftTitle={draftTitle}
-        setDraftTitle={setDraftTitle}
-        draftDesc={draftDesc}
-        setDraftDesc={setDraftDesc}
-        onSave={saveListingText}
-      />
+        {/* Price + action bar */}
+        <div className="rounded-xl bg-card border border-border overflow-hidden">
+          <div className="px-4 py-3 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-6">
+              <div>
+                <span className="text-[10px] text-muted-foreground uppercase tracking-wider block">eBay価格</span>
+                {editingPrice ? (
+                  <form onSubmit={async (e) => {
+                    e.preventDefault();
+                    const val = parseFloat(draftPrice);
+                    if (isNaN(val) || val <= 0) return;
+                    const oldPrice = item.ebayPriceUsd;
+                    await fetch(`/api/items/${item.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ebayPriceUsd: val }) });
+                    const userId = localStorage.getItem("userId") || "system";
+                    await fetch(`/api/items/${item.id}/comments`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId, content: `eBay販売価格を $${oldPrice || 0} → $${val} に変更しました` }) });
+                    const costRes = await fetch(`/api/items/${item.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "calculate_costs" }) });
+                    if (costRes.ok) setCosts(await costRes.json());
+                    setEditingPrice(false);
+                    await fetchItem();
+                  }} className="flex items-center gap-1">
+                    <span className="text-lg font-bold text-primary">$</span>
+                    <input autoFocus className="w-20 text-lg font-bold text-primary tabular-nums bg-transparent border-b border-primary outline-none" value={draftPrice} onChange={e => setDraftPrice(e.target.value)} onBlur={() => setEditingPrice(false)} onKeyDown={e => e.key === "Escape" && setEditingPrice(false)} />
+                  </form>
+                ) : (
+                  <span className="text-lg font-bold text-primary tabular-nums cursor-pointer hover:underline" onClick={() => { setDraftPrice(String(item.ebayPriceUsd || "")); setEditingPrice(true); }}>
+                    {item.ebayPriceUsd ? `$${item.ebayPriceUsd}` : "未設定"}
+                  </span>
+                )}
+              </div>
+              <div className="h-8 w-px bg-border" />
+              <div>
+                <span className="text-[10px] text-muted-foreground uppercase tracking-wider block">仕入れ</span>
+                <span className="text-sm font-medium tabular-nums">¥{(item.mercariPrice || 0).toLocaleString()}</span>
+              </div>
+              <div className="h-8 w-px bg-border" />
+              <div>
+                <span className="text-[10px] text-muted-foreground uppercase tracking-wider block">推定利益</span>
+                <span className={`text-lg font-extrabold tabular-nums ${item.estimatedProfitUsd && item.estimatedProfitUsd > 0 ? "text-emerald-400" : item.estimatedProfitUsd && item.estimatedProfitUsd < 0 ? "text-red-400" : "text-muted-foreground"}`}>
+                  {item.estimatedProfitUsd != null ? `$${item.estimatedProfitUsd.toFixed(2)}` : "-"}
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" className="text-xs h-8" onClick={() => handleAction("calculate_costs")} disabled={actionLoading === "calculate_costs"}>
+                {actionLoading === "calculate_costs" ? "計算中..." : "再計算"}
+              </Button>
+              {item.ebayStatus === "draft" && (
+                <Button className="gap-2 h-10 text-sm font-semibold shadow-sm shadow-primary/20 px-6" onClick={() => handleAction("list_on_ebay")} disabled={actionLoading === "list_on_ebay"}>
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3" /></svg>
+                  {actionLoading === "list_on_ebay" ? "出品中..." : "eBayに出品する"}
+                </Button>
+              )}
+              {item.ebayStatus === "listed" && (
+                <Button className="h-10 text-sm font-semibold" variant="destructive" onClick={() => handleAction("remove_from_ebay")} disabled={actionLoading === "remove_from_ebay"}>
+                  {actionLoading === "remove_from_ebay" ? "削除中..." : "eBayから取り下げる"}
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* eBay Preview (full width) */}
+        <EbayPreview
+          item={item}
+          mercariImages={allImages}
+          processedImages={processedImages}
+          previewImage={previewImage}
+          setPreviewImage={setPreviewImage}
+          generating={generating}
+          onGenerate={handleGenerate}
+          editingTitle={editingTitle}
+          setEditingTitle={setEditingTitle}
+          editingDesc={editingDesc}
+          setEditingDesc={setEditingDesc}
+          draftTitle={draftTitle}
+          setDraftTitle={setDraftTitle}
+          draftDesc={draftDesc}
+          setDraftDesc={setDraftDesc}
+          onSave={saveListingText}
+        />
+      </div>
+      )}
 
       {/* Lightbox overlay */}
       {lightboxImage && (
