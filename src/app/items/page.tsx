@@ -14,6 +14,8 @@ import {
 import Link from "next/link";
 import type { Item } from "@/lib/db/schema";
 import { checkShouldPass } from "@/lib/kabuto/pass-checker";
+import { exportItemsToCSV } from "@/lib/csv-export";
+import { Download } from "lucide-react";
 
 const statusLabels: Record<string, string> = {
   available: "在庫あり",
@@ -295,6 +297,11 @@ export default function ItemsPage() {
           </Select>
 
           <span className="text-[11px] text-muted-foreground/60 tabular-nums whitespace-nowrap ml-1">{filtered.length}件</span>
+
+          <Button variant="outline" size="sm" className="h-8 gap-1.5 text-[12px]" onClick={() => exportItemsToCSV(filtered)}>
+            <Download className="w-3.5 h-3.5" />
+            CSV
+          </Button>
 
           {/* View Toggle */}
           <div className="flex rounded-md border border-border/50 overflow-hidden ml-auto">
