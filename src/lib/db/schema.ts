@@ -87,6 +87,12 @@ export const items = pgTable("items", {
   aiScore: real("ai_score"), // 0-100, 高いほど利益が出やすい
   aiScoreReason: text("ai_score_reason"),
 
+  // 出品準備チェック - スタッフ毎の確認状況
+  // JSON: { [checkKey]: { [userId]: ISO timestamp } }
+  staffChecks: text("staff_checks"),
+  allCheckedAt: text("all_checked_at"), // AI+全スタッフ確認完了日時
+  listingScheduledAt: text("listing_scheduled_at"), // 出品予定日 (YYYY-MM-DD)
+
   // タイムスタンプ
   createdAt: text("created_at").default(sql`now()`).notNull(),
   updatedAt: text("updated_at").default(sql`now()`).notNull(),

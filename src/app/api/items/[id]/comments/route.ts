@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db, schema } from "@/lib/db";
 import { eq, desc } from "drizzle-orm";
 import { v4 as uuid } from "uuid";
+import { getCurrentUser } from "@/lib/auth/current-user";
 
 /**
  * GET /api/items/[id]/comments - アイテムのコメント一覧取得
@@ -37,7 +38,8 @@ export async function GET(
 
 /**
  * POST /api/items/[id]/comments - コメント作成
- * Body: { content, userId }
+ * Body: { content }
+ * userId はSupabaseセッションから取得（クライアント送信値は無視）
  */
 export async function POST(
   request: Request,
@@ -50,15 +52,16 @@ export async function POST(
     return NextResponse.json({ error: "Content required" }, { status: 400 });
   }
 
-  if (!body.userId) {
-    return NextResponse.json({ error: "userId required" }, { status: 400 });
+  const currentUser = await getCurrentUser();
+  if (!currentUser) {
+    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
   const commentId = uuid();
   await db.insert(schema.comments).values({
     id: commentId,
     itemId: id,
-    userId: body.userId,
+    userId: currentUser.id,
     content: body.content.trim(),
   });
 

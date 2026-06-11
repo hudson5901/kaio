@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { calculateCostsWithLiveRate } from "@/lib/shipping/calculator";
 import { getSettings } from "@/lib/settings";
 import { parseDimensions } from "@/lib/mercari/parser";
+import { getCurrentUser } from "@/lib/auth/current-user";
 
 export const maxDuration = 300;
 
@@ -210,6 +211,81 @@ export async function PATCH(
       return NextResponse.json({ success: true });
     }
 
+    case "toggle_staff_check": {
+      const checkKey = String(body.checkKey || "");
+      const VALID_KEYS = ["images", "title", "description", "price", "weight"] as const;
+      if (!VALID_KEYS.includes(checkKey as typeof VALID_KEYS[number])) {
+        return NextResponse.json({ error: "Invalid checkKey" }, { status: 400 });
+      }
+
+      const currentUser = await getCurrentUser();
+      if (!currentUser) {
+        return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+      }
+      const userId = currentUser.id;
+
+      type StaffChecks = Record<string, Record<string, string>>;
+      const checks: StaffChecks = item.staffChecks ? JSON.parse(item.staffChecks) : {};
+      const forKey = checks[checkKey] || {};
+      if (forKey[userId]) {
+        delete forKey[userId];
+      } else {
+        forKey[userId] = new Date().toISOString();
+      }
+      checks[checkKey] = forKey;
+
+      // AI判定状況（データ存在ベース）
+      const processedImages: string[] = item.processedImages ? JSON.parse(item.processedImages) : [];
+      const aiStatus: Record<string, boolean> = {
+        images: processedImages.length > 0,
+        title: !!item.ebayTitle,
+        description: !!item.ebayDescription,
+        price: !!item.ebayPriceUsd,
+        weight: !!item.weightG,
+      };
+
+      // 全スタッフ取得
+      const staffUsers = await db.select({ id: schema.users.id }).from(schema.users);
+      const staffIds = staffUsers.map((u) => u.id);
+
+      // 全員チェック判定: AI全項目OK & 全スタッフが全項目チェック済み
+      const aiAllOk = VALID_KEYS.every((k) => aiStatus[k]);
+      const staffAllOk =
+        staffIds.length > 0 &&
+        VALID_KEYS.every((k) => {
+          const m = checks[k] || {};
+          return staffIds.every((uid) => m[uid]);
+        });
+
+      let nextAllCheckedAt: string | null = item.allCheckedAt ?? null;
+      let nextListingScheduledAt: string | null = item.listingScheduledAt ?? null;
+      if (aiAllOk && staffAllOk) {
+        if (!nextAllCheckedAt) {
+          const now = new Date();
+          nextAllCheckedAt = now.toISOString();
+          const next = new Date(now);
+          next.setDate(next.getDate() + 1);
+          nextListingScheduledAt = next.toISOString().slice(0, 10);
+        }
+      } else {
+        nextAllCheckedAt = null;
+        nextListingScheduledAt = null;
+      }
+
+      await db.update(schema.items).set({
+        staffChecks: JSON.stringify(checks),
+        allCheckedAt: nextAllCheckedAt,
+        listingScheduledAt: nextListingScheduledAt,
+        updatedAt: new Date().toISOString(),
+      }).where(eq(schema.items.id, id));
+
+      return NextResponse.json({
+        staffChecks: checks,
+        allCheckedAt: nextAllCheckedAt,
+        listingScheduledAt: nextListingScheduledAt,
+      });
+    }
+
     default: {
       // 一般的な更新
       const allowedFields = [
@@ -237,6 +313,24 @@ export async function PATCH(
       updates.updatedAt = new Date().toISOString();
 
       await db.update(schema.items).set(updates).where(eq(schema.items.id, id));
+
+      // 「出品」判定された時、画像未処理なら自動で画像処理を実行（非同期・fire-and-forget）
+      if (body.decision === "list" && item.decision !== "list") {
+        const hasProcessed = item.processedImages && JSON.parse(item.processedImages).length > 0;
+        if (!hasProcessed) {
+          const imageUrls: string[] = item.mercariImages ? JSON.parse(item.mercariImages) : [];
+          if (imageUrls.length > 0) {
+            import("@/lib/image/processor").then(({ processItemImages }) =>
+              processItemImages(item.id, imageUrls).then((paths) =>
+                db.update(schema.items).set({
+                  processedImages: JSON.stringify(paths),
+                  updatedAt: new Date().toISOString(),
+                }).where(eq(schema.items.id, id))
+              )
+            ).catch((err) => console.error(`Auto image processing failed for ${id}:`, err));
+          }
+        }
+      }
 
       return NextResponse.json({ success: true });
     }

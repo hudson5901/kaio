@@ -23,6 +23,39 @@ function StatusDot({ status }: { status: string }) {
   return <span className={`inline-block w-2 h-2 rounded-full ${statusColors[status] || "bg-zinc-400"}`} />;
 }
 
+function CheckAvatar({
+  label,
+  checked,
+  interactive,
+  loading,
+  onClick,
+  title,
+}: {
+  label: string;
+  checked: boolean;
+  interactive?: boolean;
+  loading?: boolean;
+  onClick?: () => void;
+  title?: string;
+}) {
+  const base = "w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-semibold border transition-colors select-none";
+  const cls = checked
+    ? "bg-emerald-500/20 border-emerald-500 text-emerald-300"
+    : "bg-muted/40 border-border text-muted-foreground/60";
+  const hover = interactive ? " cursor-pointer hover:border-emerald-400 hover:text-foreground" : " cursor-default";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={!interactive || loading}
+      title={title}
+      className={`${base} ${cls}${hover} ${loading ? "opacity-50" : ""}`}
+    >
+      {label}
+    </button>
+  );
+}
+
 export default function ItemDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
@@ -48,6 +81,9 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
   const [classifying, setClassifying] = useState(false);
   const [adjacentItems, setAdjacentItems] = useState<{ prev: string | null; next: string | null; currentIndex: number; total: number }>({ prev: null, next: null, currentIndex: 0, total: 0 });
   const [viewMode, setViewMode] = useState<"judge" | "ebay">(tab === "ebay" ? "ebay" : "judge");
+  const [currentUser, setCurrentUser] = useState<{ id: string; name: string } | null>(null);
+  const [staffUsers, setStaffUsers] = useState<{ id: string; name: string }[]>([]);
+  const [togglingCheck, setTogglingCheck] = useState<string | null>(null);
   const navQueryFor = (mode: "judge" | "ebay") => {
     const parts = [from && `from=${from}`, mode === "ebay" && "tab=ebay"].filter(Boolean);
     return parts.length > 0 ? `?${parts.join("&")}` : "";
@@ -61,6 +97,16 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
   }, [item?.id, item?.mercariTitle, item?.mercariDescription, item?.mercariPrice]);
 
   useEffect(() => { fetchItem(); fetchAdjacentItems(); setSelectedImage(0); }, [id]);
+
+  // ログイン中ユーザーと全スタッフ取得（出品準備チェック用）
+  useEffect(() => {
+    fetch("/api/auth/me").then((r) => r.json()).then((d) => {
+      if (d && !d.error) setCurrentUser({ id: d.id, name: d.name });
+    }).catch(() => {});
+    fetch("/api/users").then((r) => r.json()).then((d) => {
+      if (Array.isArray(d)) setStaffUsers(d.map((u) => ({ id: u.id, name: u.name })));
+    }).catch(() => {});
+  }, []);
 
   // 次のアイテムをプリフェッチ（遷移を高速化）
   useEffect(() => {
@@ -566,8 +612,7 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
                     // 価格更新
                     await fetch(`/api/items/${item.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ebayPriceUsd: val }) });
                     // コメントにログ
-                    const userId = localStorage.getItem("userId") || "system";
-                    await fetch(`/api/items/${item.id}/comments`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId, content: `eBay販売価格を $${oldPrice || 0} → $${val} に変更しました` }) });
+                    await fetch(`/api/items/${item.id}/comments`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ content: `eBay販売価格を $${oldPrice || 0} → $${val} に変更しました` }) });
                     // 費用再計算
                     const costRes = await fetch(`/api/items/${item.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "calculate_costs" }) });
                     if (costRes.ok) setCosts(await costRes.json());
@@ -861,29 +906,83 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
       /* eBay出品 - 最終確認画面 */
       <div className="space-y-4">
         {/* Readiness checklist */}
-        <div className="rounded-xl bg-card border border-border overflow-hidden">
-          <div className="px-4 py-2.5 border-b border-border bg-muted/30">
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">出品準備チェック</h3>
-          </div>
-          <div className="px-4 py-3 flex flex-wrap gap-3">
-            {[
-              { ok: processedImages.length > 0, label: `画像加工済み (${processedImages.length}枚)` },
-              { ok: !!item.ebayTitle, label: "タイトル" },
-              { ok: !!item.ebayDescription, label: "説明文" },
-              { ok: !!item.ebayPriceUsd, label: "価格設定" },
-              { ok: !!item.weightG, label: "重量" },
-            ].map(({ ok, label }) => (
-              <div key={label} className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border ${ok ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400" : "border-border bg-muted/30 text-muted-foreground"}`}>
-                {ok ? (
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
-                ) : (
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" /></svg>
+        {(() => {
+          const checks = [
+            { key: "images", ok: processedImages.length > 0, label: `画像加工済み (${processedImages.length}枚)` },
+            { key: "title", ok: !!item.ebayTitle, label: "タイトル" },
+            { key: "description", ok: !!item.ebayDescription, label: "説明文" },
+            { key: "price", ok: !!item.ebayPriceUsd, label: "価格設定" },
+            { key: "weight", ok: !!item.weightG, label: "重量" },
+          ] as const;
+          let staffChecks: Record<string, Record<string, string>> = {};
+          try { staffChecks = item.staffChecks ? JSON.parse(item.staffChecks) : {}; } catch { /* ignore */ }
+
+          async function toggleCheck(checkKey: string) {
+            if (!currentUser || !item) return;
+            const token = `${checkKey}:${currentUser.id}`;
+            setTogglingCheck(token);
+            // 楽観的更新
+            const next = { ...staffChecks, [checkKey]: { ...(staffChecks[checkKey] || {}) } };
+            if (next[checkKey][currentUser.id]) delete next[checkKey][currentUser.id];
+            else next[checkKey][currentUser.id] = new Date().toISOString();
+            setItem({ ...item, staffChecks: JSON.stringify(next) });
+            try {
+              await fetch(`/api/items/${item.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "toggle_staff_check", checkKey, userId: currentUser.id }),
+              });
+              await fetchItem();
+            } finally {
+              setTogglingCheck(null);
+            }
+          }
+
+          return (
+            <div className="rounded-xl bg-card border border-border overflow-hidden">
+              <div className="px-4 py-2.5 border-b border-border bg-muted/30 flex items-center justify-between gap-3">
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">出品準備チェック</h3>
+                {item.listingScheduledAt && (
+                  <span className="text-[11px] text-emerald-400 tabular-nums">
+                    全員確認済 ・ 出品予定 {item.listingScheduledAt}
+                  </span>
                 )}
-                {label}
               </div>
-            ))}
-          </div>
-        </div>
+              <div className="px-4 py-3 flex flex-col gap-2">
+                {checks.map(({ key, ok, label }) => (
+                  <div key={key} className={`flex items-center justify-between gap-3 text-xs px-3 py-2 rounded-lg border ${ok ? "border-emerald-500/30 bg-emerald-500/10" : "border-border bg-muted/30"}`}>
+                    <div className={`flex items-center gap-2 ${ok ? "text-emerald-400" : "text-muted-foreground"}`}>
+                      {ok ? (
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
+                      ) : (
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" /></svg>
+                      )}
+                      {label}
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <CheckAvatar label="AI" checked={ok} title={ok ? "AIチェック済" : "AI未確認"} />
+                      {staffUsers.map((u) => {
+                        const checkedAt = staffChecks[key]?.[u.id];
+                        const isSelf = currentUser?.id === u.id;
+                        return (
+                          <CheckAvatar
+                            key={u.id}
+                            label={u.name.charAt(0)}
+                            checked={!!checkedAt}
+                            interactive={isSelf}
+                            loading={togglingCheck === `${key}:${u.id}`}
+                            onClick={isSelf ? () => toggleCheck(key) : undefined}
+                            title={`${u.name}${checkedAt ? ` ・ ${new Date(checkedAt).toLocaleString("ja-JP")}` : isSelf ? " (クリックで確認)" : " 未確認"}`}
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Price + action bar */}
         <div className="rounded-xl bg-card border border-border overflow-hidden">
@@ -898,8 +997,7 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
                     if (isNaN(val) || val <= 0) return;
                     const oldPrice = item.ebayPriceUsd;
                     await fetch(`/api/items/${item.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ebayPriceUsd: val }) });
-                    const userId = localStorage.getItem("userId") || "system";
-                    await fetch(`/api/items/${item.id}/comments`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId, content: `eBay販売価格を $${oldPrice || 0} → $${val} に変更しました` }) });
+                    await fetch(`/api/items/${item.id}/comments`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ content: `eBay販売価格を $${oldPrice || 0} → $${val} に変更しました` }) });
                     const costRes = await fetch(`/api/items/${item.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "calculate_costs" }) });
                     if (costRes.ok) setCosts(await costRes.json());
                     setEditingPrice(false);
