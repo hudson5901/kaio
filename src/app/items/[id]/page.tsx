@@ -28,9 +28,9 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
   const router = useRouter();
   const searchParams = useSearchParams();
   const from = searchParams.get("from");
+  const tab = searchParams.get("tab");
   const backHref = from === "ebay-listing" ? "/ebay-listing" : "/items";
   const backLabel = from === "ebay-listing" ? "eBay出品" : "アイテム管理";
-  const fromQuery = from ? `?from=${from}` : "";
   const [item, setItem] = useState<Item | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [costs, setCosts] = useState<Record<string, number> | null>(null);
@@ -47,7 +47,12 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
   const [scoring, setScoring] = useState(false);
   const [classifying, setClassifying] = useState(false);
   const [adjacentItems, setAdjacentItems] = useState<{ prev: string | null; next: string | null; currentIndex: number; total: number }>({ prev: null, next: null, currentIndex: 0, total: 0 });
-  const [viewMode, setViewMode] = useState<"judge" | "ebay">("judge");
+  const [viewMode, setViewMode] = useState<"judge" | "ebay">(tab === "ebay" ? "ebay" : "judge");
+  const navQueryFor = (mode: "judge" | "ebay") => {
+    const parts = [from && `from=${from}`, mode === "ebay" && "tab=ebay"].filter(Boolean);
+    return parts.length > 0 ? `?${parts.join("&")}` : "";
+  };
+  const navQuery = navQueryFor(viewMode);
 
   // パスチェッカー
   const passCheck = useMemo<PassCheckResult | null>(() => {
@@ -82,9 +87,9 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
     function handleKeyDown(e: KeyboardEvent) {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       if (e.key === "ArrowLeft" && adjacentItems.prev) {
-        router.push(`/items/${adjacentItems.prev}${fromQuery}`);
+        router.push(`/items/${adjacentItems.prev}${navQuery}`);
       } else if (e.key === "ArrowRight" && adjacentItems.next) {
-        router.push(`/items/${adjacentItems.next}${fromQuery}`);
+        router.push(`/items/${adjacentItems.next}${navQuery}`);
       } else if (e.key === "1") {
         handleDecision("list");
       } else if (e.key === "2") {
@@ -157,7 +162,7 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
 
     // 判定を設定した場合のみ、短い遅延後に次のアイテムへ自動遷移
     if (newDecision && adjacentItems.next) {
-      setTimeout(() => router.push(`/items/${adjacentItems.next}${fromQuery}`), 150);
+      setTimeout(() => router.push(`/items/${adjacentItems.next}${navQuery}`), 150);
     }
   }
 
@@ -265,7 +270,7 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
             </span>
           )}
           <button
-            onClick={() => adjacentItems.prev && router.push(`/items/${adjacentItems.prev}${fromQuery}`)}
+            onClick={() => adjacentItems.prev && router.push(`/items/${adjacentItems.prev}${navQuery}`)}
             disabled={!adjacentItems.prev}
             className="w-8 h-8 rounded-md flex items-center justify-center border border-border/60 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
             title="前のアイテム"
@@ -275,7 +280,7 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
             </svg>
           </button>
           <button
-            onClick={() => adjacentItems.next && router.push(`/items/${adjacentItems.next}${fromQuery}`)}
+            onClick={() => adjacentItems.next && router.push(`/items/${adjacentItems.next}${navQuery}`)}
             disabled={!adjacentItems.next}
             className="w-8 h-8 rounded-md flex items-center justify-center border border-border/60 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
             title="次のアイテム"
@@ -295,7 +300,14 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
         ] as const).map(({ value, label }) => (
           <button
             key={value}
-            onClick={() => setViewMode(value)}
+            onClick={() => {
+              setViewMode(value);
+              const params = new URLSearchParams(window.location.search);
+              if (value === "ebay") params.set("tab", "ebay");
+              else params.delete("tab");
+              const qs = params.toString();
+              router.replace(`/items/${id}${qs ? `?${qs}` : ""}`, { scroll: false });
+            }}
             className={`px-3 py-2 text-[13px] font-medium border-b-2 transition-colors -mb-px ${
               viewMode === value
                 ? "border-primary text-foreground"
