@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import type { Item } from "@/lib/db/schema";
 import { Button } from "@/components/ui/button";
 import {
@@ -223,9 +224,9 @@ export default function EbayListingPage() {
                       )}
                     </button>
                   </span>
-                  <Link href={`/items/${item.id}?from=ebay-listing`}>
+                  <Link href={`/items/${item.id}?from=ebay-listing`} className="relative w-7 h-7 flex-shrink-0">
                     {images[0] ? (
-                      <img src={images[0]} alt="" loading="lazy" className="w-7 h-7 rounded object-cover" />
+                      <Image src={images[0]} alt="" fill sizes="28px" className="rounded object-cover" />
                     ) : (
                       <div className="w-7 h-7 rounded bg-accent" />
                     )}
