@@ -14,7 +14,7 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog";
-import { Download, RefreshCw } from "lucide-react";
+import { Download, RefreshCw, Search } from "lucide-react";
 import { mapItemToEbayListing, type EbayListingData } from "@/lib/ebay/mapping";
 import { validateEbayListing, type ValidationResult } from "@/lib/ebay/validation";
 import { downloadEbayDraftCsv } from "@/lib/ebay/draft-csv";
@@ -47,6 +47,7 @@ export default function EbayListingPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     fetch("/api/items")
@@ -87,10 +88,19 @@ export default function EbayListingPage() {
   }
 
   const filteredItems = useMemo(() => {
-    if (statusFilter === "all") return items;
-    if (statusFilter === "checked") return items.filter((i) => !!i.listingScheduledAt);
-    return items.filter((i) => i.ebayStatus === statusFilter);
-  }, [items, statusFilter]);
+    let result = items;
+    if (statusFilter === "checked") result = result.filter((i) => !!i.listingScheduledAt);
+    else if (statusFilter !== "all") result = result.filter((i) => i.ebayStatus === statusFilter);
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      result = result.filter((i) =>
+        (i.mercariTitle || "").toLowerCase().includes(q) ||
+        (i.ebayTitle || "").toLowerCase().includes(q) ||
+        (i.mercariId || "").toLowerCase().includes(q)
+      );
+    }
+    return result;
+  }, [items, statusFilter, search]);
 
   const sortedItems = useMemo(() => {
     if (!sortKey) return filteredItems;
@@ -255,6 +265,18 @@ export default function EbayListingPage() {
         );
       })()}
 
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/50" />
+        <input
+          type="text"
+          placeholder="商品名・eBayタイトル・IDで検索..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full h-8 pl-8 pr-3 rounded-md border border-border/60 bg-transparent text-[13px] placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-ring"
+        />
+      </div>
+
       {/* Selection bar */}
       {selected.size > 0 && (
         <div className="flex items-center gap-3 rounded-lg bg-accent/80 px-4 py-2 animate-in slide-in-from-top-2">
@@ -269,10 +291,20 @@ export default function EbayListingPage() {
       )}
 
       {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <svg className="w-5 h-5 text-muted-foreground/50 animate-spin-slow" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" />
-          </svg>
+        <div className="border border-border/60 rounded-lg overflow-hidden">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className={`grid grid-cols-[32px_36px_1fr_80px_80px_80px_80px_60px_50px] gap-0 px-3 py-2.5 items-center ${i > 0 ? "border-t border-border/30" : ""}`}>
+              <div />
+              <div className="w-7 h-7 rounded bg-accent animate-pulse" />
+              <div className="h-3.5 bg-accent rounded w-3/4 animate-pulse" />
+              <div className="h-3 bg-accent/60 rounded w-12 ml-auto animate-pulse" />
+              <div className="h-3 bg-accent/60 rounded w-10 ml-auto animate-pulse" />
+              <div className="h-3 bg-accent/60 rounded w-10 ml-auto animate-pulse" />
+              <div className="h-3 bg-accent/60 rounded w-10 ml-auto animate-pulse" />
+              <div className="h-3 bg-accent/60 rounded w-5 mx-auto animate-pulse" />
+              <div className="h-3 bg-accent/60 rounded w-6 ml-auto animate-pulse" />
+            </div>
+          ))}
         </div>
       ) : items.length === 0 ? (
         <div className="text-center py-20">
@@ -284,7 +316,7 @@ export default function EbayListingPage() {
       ) : (
         <div className="border border-border/60 rounded-lg overflow-x-auto">
           {/* Table header */}
-          <div className="grid grid-cols-[32px_36px_1fr_80px_80px_80px_80px_60px_50px] gap-0 px-3 py-2.5 border-b border-border/60 text-[11px] font-medium text-muted-foreground/70 uppercase tracking-wider bg-accent/30">
+          <div className="sticky top-0 z-10 grid grid-cols-[32px_36px_1fr_80px_80px_80px_80px_60px_50px] gap-0 px-3 py-2.5 border-b border-border/60 text-[11px] font-medium text-muted-foreground/70 uppercase tracking-wider bg-accent/30 backdrop-blur-sm">
             <span className="flex items-center">
               <button
                 onClick={toggleSelectAll}

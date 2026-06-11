@@ -344,10 +344,17 @@ export default function ItemsPage() {
 
       {/* Content */}
       {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <svg className="w-5 h-5 text-muted-foreground/50 animate-spin-slow" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" />
-          </svg>
+        <div className="border border-border/60 rounded-lg overflow-hidden">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className={`flex items-center gap-3 px-3 py-3 ${i > 0 ? "border-t border-border/30" : ""}`}>
+              <div className="w-9 h-9 rounded bg-accent animate-pulse" />
+              <div className="flex-1 space-y-1.5">
+                <div className="h-3.5 bg-accent rounded w-2/3 animate-pulse" />
+                <div className="h-2.5 bg-accent/60 rounded w-1/3 animate-pulse" />
+              </div>
+              <div className="h-3.5 bg-accent rounded w-16 animate-pulse" />
+            </div>
+          ))}
         </div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-20">
@@ -452,7 +459,7 @@ export default function ItemsPage() {
         /* List View - Notion-like clean table */
         <div className="border border-border/60 rounded-lg overflow-x-auto">
           {/* Table header */}
-          <div className="grid grid-cols-[32px_36px_1fr_72px_80px_80px_44px_80px_80px_60px_60px] gap-0 px-3 py-2.5 border-b border-border/60 text-[11px] font-medium text-muted-foreground/70 uppercase tracking-wider bg-accent/30">
+          <div className="sticky top-0 z-10 grid grid-cols-[32px_36px_1fr_72px_80px_80px_44px_80px_80px_60px_60px] gap-0 px-3 py-2.5 border-b border-border/60 text-[11px] font-medium text-muted-foreground/70 uppercase tracking-wider bg-accent/30 backdrop-blur-sm">
             <span className="flex items-center">
               <button
                 onClick={toggleSelectAll}

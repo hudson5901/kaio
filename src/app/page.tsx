@@ -87,6 +87,7 @@ export default function Dashboard() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [scheduler, setScheduler] = useState<SchedulerState | null>(null);
+  const [toast, setToast] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const notifRef = useRef<HTMLDivElement>(null);
 
   const fetchItems = useCallback(async () => {
@@ -144,6 +145,11 @@ export default function Dashboard() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  function showToast(type: "success" | "error", text: string) {
+    setToast({ type, text });
+    setTimeout(() => setToast(null), 5000);
+  }
+
   async function handleSync() {
     setSyncing(true);
     let totalChecked = 0, totalSold = 0, totalRemoved = 0;
@@ -151,17 +157,17 @@ export default function Dashboard() {
       let hasMore = true;
       while (hasMore) {
         const res = await fetch("/api/sync", { method: "POST" });
-        if (!res.ok) { alert("同期に失敗しました"); break; }
+        if (!res.ok) { showToast("error", "同期に失敗しました"); break; }
         const result = await res.json();
         totalChecked += result.checked;
         totalSold += result.soldOnMercari;
         totalRemoved += result.removedFromEbay;
         hasMore = result.hasMore;
       }
-      alert(`同期完了: ${totalChecked}件チェック, ${totalSold}件売り切れ, ${totalRemoved}件eBay削除`);
+      showToast("success", `同期完了: ${totalChecked}件チェック, ${totalSold}件売り切れ, ${totalRemoved}件eBay削除`);
       fetchItems();
       fetchNotifications();
-    } catch { alert("同期に失敗しました"); }
+    } catch { showToast("error", "同期に失敗しました"); }
     finally { setSyncing(false); }
   }
 
@@ -217,6 +223,17 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8">
+      {/* Toast */}
+      {toast && (
+        <div className={`fixed top-4 right-4 z-50 rounded-lg px-4 py-2.5 text-[13px] font-medium shadow-lg animate-in slide-in-from-top-2 ${
+          toast.type === "success"
+            ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 backdrop-blur-sm"
+            : "bg-red-500/10 text-red-600 border border-red-500/20 backdrop-blur-sm"
+        }`}>
+          {toast.text}
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
