@@ -16,6 +16,7 @@ import Image from "next/image";
 import type { Item } from "@/lib/db/schema";
 import { checkShouldPass } from "@/lib/kabuto/pass-checker";
 import { exportItemsToCSV } from "@/lib/csv-export";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Download } from "lucide-react";
 
 const statusLabels: Record<string, string> = {
@@ -57,6 +58,7 @@ export default function ItemsPage() {
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkLoading, setBulkLoading] = useState<string | null>(null);
+  const [confirmBulk, setConfirmBulk] = useState<{ action: string; ids: string[]; message: string } | null>(null);
 
   useEffect(() => { fetchItems(); }, []);
 
@@ -149,17 +151,18 @@ export default function ItemsPage() {
     }
   }
 
-  async function handleBulkAction(action: string) {
+  function handleBulkAction(action: string) {
     const targetIds = selected.size > 0 ? [...selected] : filtered.filter(i => i.mercariStatus === "available").map(i => i.id);
     if (targetIds.length === 0) return;
+    const actionLabel = action === "calculate_costs" ? "費用計算" : action === "process_images" ? "画像処理" : action === "delete" ? "削除" : action;
+    const message = selected.size > 0
+      ? `選択した${targetIds.length}件に「${actionLabel}」を実行します。`
+      : `フィルタ対象の${targetIds.length}件に「${actionLabel}」を実行します。`;
+    setConfirmBulk({ action, ids: targetIds, message });
+  }
 
-    const confirmMsg = selected.size > 0
-      ? `選択した${targetIds.length}件に「${action === "calculate_costs" ? "費用計算" : action === "process_images" ? "画像処理" : action === "delete" ? "削除" : action}」を実行しますか？`
-      : `フィルタ対象の${targetIds.length}件に実行しますか？`;
-    if (!confirm(confirmMsg)) return;
-
+  async function executeBulkAction(action: string, targetIds: string[]) {
     setBulkLoading(action);
-
     if (action === "delete") {
       for (const id of targetIds) {
         await fetch(`/api/items/${id}`, { method: "DELETE" });
@@ -173,7 +176,6 @@ export default function ItemsPage() {
         });
       }
     }
-
     setBulkLoading(null);
     setSelected(new Set());
     fetchItems();
@@ -459,7 +461,7 @@ export default function ItemsPage() {
         /* List View - Notion-like clean table */
         <div className="border border-border/60 rounded-lg overflow-x-auto">
           {/* Table header */}
-          <div className="sticky top-0 z-10 grid grid-cols-[32px_36px_1fr_72px_80px_80px_44px_80px_80px_60px_60px] gap-0 px-3 py-2.5 border-b border-border/60 text-[11px] font-medium text-muted-foreground/70 uppercase tracking-wider bg-accent/30 backdrop-blur-sm">
+          <div className="sticky top-0 z-10 grid grid-cols-[32px_36px_1fr_72px] sm:grid-cols-[32px_36px_1fr_72px_80px_80px_44px_80px_80px_60px_60px] gap-0 px-3 py-2.5 border-b border-border/60 text-[11px] font-medium text-muted-foreground/70 uppercase tracking-wider bg-accent/30 backdrop-blur-sm">
             <span className="flex items-center">
               <button
                 onClick={toggleSelectAll}
@@ -477,13 +479,13 @@ export default function ItemsPage() {
             <span></span>
             <span>商品名</span>
             <span className="text-right">利益</span>
-            <span className="text-right">仕入れ</span>
-            <span className="text-right">eBay</span>
-            <span className="text-right">AI</span>
-            <span>メルカリ</span>
-            <span>eBay</span>
-            <span className="text-right">作成</span>
-            <span className="text-right">更新</span>
+            <span className="hidden sm:block text-right">仕入れ</span>
+            <span className="hidden sm:block text-right">eBay</span>
+            <span className="hidden sm:block text-right">AI</span>
+            <span className="hidden sm:block">メルカリ</span>
+            <span className="hidden sm:block">eBay</span>
+            <span className="hidden sm:block text-right">作成</span>
+            <span className="hidden sm:block text-right">更新</span>
           </div>
           {/* Table rows */}
           <div>
@@ -493,7 +495,7 @@ export default function ItemsPage() {
               return (
                 <div
                   key={item.id}
-                  className={`grid grid-cols-[32px_36px_1fr_72px_80px_80px_44px_80px_80px_60px_60px] gap-0 px-3 py-2 items-center transition-colors ${
+                  className={`grid grid-cols-[32px_36px_1fr_72px] sm:grid-cols-[32px_36px_1fr_72px_80px_80px_44px_80px_80px_60px_60px] gap-0 px-3 py-2 items-center transition-colors ${
                     isSelected
                       ? "bg-accent/60"
                       : "hover:bg-accent/40"
@@ -531,27 +533,27 @@ export default function ItemsPage() {
                       </span>
                     ) : <span className="text-[13px] text-muted-foreground/30">--</span>}
                   </span>
-                  <span className="text-[13px] text-right tabular-nums text-muted-foreground">¥{(item.mercariPrice || 0).toLocaleString()}</span>
-                  <span className="text-[13px] text-right tabular-nums">{item.ebayPriceUsd ? `$${item.ebayPriceUsd}` : <span className="text-muted-foreground/30">--</span>}</span>
-                  <span className={`text-[12px] text-right tabular-nums font-medium ${item.aiScore != null && item.aiScore >= 70 ? "text-emerald-500" : item.aiScore != null && item.aiScore >= 40 ? "text-amber-500" : item.aiScore != null ? "text-red-400" : ""}`}>
+                  <span className="hidden sm:block text-[13px] text-right tabular-nums text-muted-foreground">¥{(item.mercariPrice || 0).toLocaleString()}</span>
+                  <span className="hidden sm:block text-[13px] text-right tabular-nums">{item.ebayPriceUsd ? `$${item.ebayPriceUsd}` : <span className="text-muted-foreground/30">--</span>}</span>
+                  <span className={`hidden sm:block text-[12px] text-right tabular-nums font-medium ${item.aiScore != null && item.aiScore >= 70 ? "text-emerald-500" : item.aiScore != null && item.aiScore >= 40 ? "text-amber-500" : item.aiScore != null ? "text-red-400" : ""}`}>
                     {item.aiScore != null ? item.aiScore : <span className="text-muted-foreground/30">--</span>}
                   </span>
-                  <div>
+                  <div className="hidden sm:block">
                     <span className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
                       <StatusDot status={item.mercariStatus} />
                       {statusLabels[item.mercariStatus]}
                     </span>
                   </div>
-                  <div>
+                  <div className="hidden sm:block">
                     <span className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
                       <StatusDot status={item.ebayStatus} />
                       {statusLabels[item.ebayStatus]}
                     </span>
                   </div>
-                  <span className="text-[11px] text-muted-foreground/60 tabular-nums text-right">
+                  <span className="hidden sm:block text-[11px] text-muted-foreground/60 tabular-nums text-right">
                     {new Date(item.createdAt).toLocaleDateString("ja-JP", { month: "numeric", day: "numeric" })}
                   </span>
-                  <span className="text-[11px] text-muted-foreground/60 tabular-nums text-right">
+                  <span className="hidden sm:block text-[11px] text-muted-foreground/60 tabular-nums text-right">
                     {new Date(item.updatedAt).toLocaleDateString("ja-JP", { month: "numeric", day: "numeric" })}
                   </span>
                 </div>
@@ -614,6 +616,17 @@ export default function ItemsPage() {
           </span>
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!confirmBulk}
+        onOpenChange={(open) => { if (!open) setConfirmBulk(null); }}
+        title="一括操作の確認"
+        description={confirmBulk?.message || ""}
+        confirmLabel={confirmBulk?.action === "delete" ? "削除" : "実行"}
+        variant={confirmBulk?.action === "delete" ? "destructive" : "default"}
+        onConfirm={() => { if (confirmBulk) executeBulkAction(confirmBulk.action, confirmBulk.ids); }}
+        loading={!!bulkLoading}
+      />
     </div>
   );
 }

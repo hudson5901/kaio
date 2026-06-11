@@ -8,6 +8,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { Item } from "@/lib/db/schema";
 import { CommentsSection } from "@/components/comments-section";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { checkShouldPass, type PassCheckResult } from "@/lib/kabuto/pass-checker";
 
 const statusLabels: Record<string, string> = {
@@ -65,6 +66,9 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
   const [currentUser, setCurrentUser] = useState<{ id: string; name: string } | null>(null);
   const [staffUsers, setStaffUsers] = useState<{ id: string; name: string }[]>([]);
   const [togglingCheck, setTogglingCheck] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [toast, setToast] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [showShortcuts, setShowShortcuts] = useState(false);
   const navQueryFor = (mode: "judge" | "ebay") => {
     const parts = [from && `from=${from}`, mode === "ebay" && "tab=ebay"].filter(Boolean);
     return parts.length > 0 ? `?${parts.join("&")}` : "";
@@ -123,6 +127,8 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
         handleDecision("considering");
       } else if (e.key === "3") {
         handleDecision("pass");
+      } else if (e.key === "?") {
+        setShowShortcuts((v) => !v);
       }
     }
     window.addEventListener("keydown", handleKeyDown);
@@ -233,19 +239,23 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
     else setEditingDesc(false);
   }
 
+  function showItemToast(type: "success" | "error", text: string) {
+    setToast({ type, text });
+    setTimeout(() => setToast(null), 4000);
+  }
+
   async function handleScore() {
     setScoring(true);
     try {
       const res = await fetch(`/api/items/${id}/score`, { method: "POST" });
       const data = await res.json();
       if (data.score != null) await fetchItem();
-      else alert("スコアリングに失敗しました");
-    } catch (err) { alert(`Error: ${err}`); }
+      else showItemToast("error", "スコアリングに失敗しました");
+    } catch (err) { showItemToast("error", `エラー: ${err}`); }
     finally { setScoring(false); }
   }
 
   async function handleDelete() {
-    if (!confirm("このアイテムを削除しますか?")) return;
     await fetch(`/api/items/${id}`, { method: "DELETE" });
     window.location.href = backHref;
   }
@@ -256,7 +266,7 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
       const res = await fetch(`/api/items/${id}/classify`, { method: "POST" });
       const data = await res.json();
       if (data.success) await fetchItem();
-      else alert("分類に失敗しました: " + (data.error || "unknown"));
+      else showItemToast("error", "分類に失敗しました: " + (data.error || "unknown"));
     } catch (err) { alert(`Error: ${err}`); }
     finally { setClassifying(false); }
   }
@@ -315,6 +325,13 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
             </svg>
+          </button>
+          <button
+            onClick={() => setShowShortcuts(true)}
+            className="w-8 h-8 rounded-md flex items-center justify-center border border-border/60 text-muted-foreground/50 hover:bg-accent hover:text-foreground transition-colors text-[12px] font-mono"
+            title="キーボードショートカット"
+          >
+            ?
           </button>
         </div>
       </div>
@@ -877,7 +894,7 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
                 </Button>
               </a>
             )}
-            <Button className="w-full text-muted-foreground text-xs h-8" variant="ghost" onClick={handleDelete}>
+            <Button className="w-full text-muted-foreground text-xs h-8" variant="ghost" onClick={() => setConfirmDelete(true)}>
               アイテムを削除
             </Button>
           </div>
@@ -1099,6 +1116,57 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
             className="max-w-[90vw] max-h-[90vh] object-contain"
             onClick={(e) => e.stopPropagation()}
           />
+        </div>
+      )}
+
+      {/* Toast */}
+      {toast && (
+        <div className={`fixed top-4 right-4 z-50 rounded-lg px-4 py-2.5 text-[13px] font-medium shadow-lg animate-in slide-in-from-top-2 ${
+          toast.type === "success"
+            ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 backdrop-blur-sm"
+            : "bg-red-500/10 text-red-600 border border-red-500/20 backdrop-blur-sm"
+        }`}>
+          {toast.text}
+        </div>
+      )}
+
+      {/* Delete confirm */}
+      <ConfirmDialog
+        open={confirmDelete}
+        onOpenChange={setConfirmDelete}
+        title="アイテムを削除"
+        description="このアイテムを完全に削除します。この操作は取り消せません。"
+        confirmLabel="削除"
+        variant="destructive"
+        onConfirm={handleDelete}
+      />
+
+      {/* Keyboard shortcuts help */}
+      {showShortcuts && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center" onClick={() => setShowShortcuts(false)}>
+          <div className="bg-popover rounded-xl p-5 shadow-lg border border-border max-w-xs w-full" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-sm font-semibold mb-3">キーボードショートカット</h3>
+            <div className="space-y-2 text-[13px]">
+              {[
+                { keys: ["←"], desc: "前のアイテム" },
+                { keys: ["→"], desc: "次のアイテム" },
+                { keys: ["1"], desc: "出品" },
+                { keys: ["2"], desc: "検討" },
+                { keys: ["3"], desc: "パス" },
+                { keys: ["?"], desc: "ショートカット表示" },
+              ].map((s) => (
+                <div key={s.desc} className="flex items-center justify-between">
+                  <span className="text-muted-foreground">{s.desc}</span>
+                  <div className="flex gap-1">
+                    {s.keys.map((k) => (
+                      <kbd key={k} className="min-w-[24px] h-6 px-1.5 rounded border border-border bg-accent text-[11px] font-mono flex items-center justify-center">{k}</kbd>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <button onClick={() => setShowShortcuts(false)} className="mt-4 w-full text-[12px] text-muted-foreground hover:text-foreground text-center">閉じる</button>
+          </div>
         </div>
       )}
     </div>

@@ -29,9 +29,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     if (saved === "true") setCollapsed(true);
   }, []);
 
-  // 未読通知数をポーリング
+  // 未読通知数をポーリング（タブ非表示時は停止）
   useEffect(() => {
     function fetchUnread() {
+      if (document.hidden) return;
       fetch("/api/notifications?unread=true&limit=100")
         .then(r => r.json())
         .then(data => { if (Array.isArray(data)) setUnreadCount(data.length); })
@@ -39,7 +40,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }
     fetchUnread();
     const iv = setInterval(fetchUnread, 30000);
-    return () => clearInterval(iv);
+    document.addEventListener("visibilitychange", fetchUnread);
+    return () => { clearInterval(iv); document.removeEventListener("visibilitychange", fetchUnread); };
   }, []);
 
   function toggleSidebar() {

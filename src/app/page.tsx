@@ -126,12 +126,7 @@ export default function Dashboard() {
     fetchItems();
     fetchNotifications();
     fetchScheduler();
-
-    // 通知を30秒ごとにポーリング
-    const pollInterval = setInterval(() => {
-      fetchNotifications();
-    }, 30000);
-    return () => clearInterval(pollInterval);
+    // 通知ポーリングはapp-shellで行うため、ここでは初回取得のみ
   }, [fetchItems, fetchNotifications, fetchScheduler]);
 
   // 通知パネル外クリックで閉じる

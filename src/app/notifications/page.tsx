@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import Link from "next/link";
 
 interface Notification {
@@ -26,6 +27,7 @@ export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>("all");
+  const [confirmDeleteRead, setConfirmDeleteRead] = useState(false);
 
   useEffect(() => { fetchNotifications(); }, []);
 
@@ -57,7 +59,6 @@ export default function NotificationsPage() {
   }
 
   async function deleteRead() {
-    if (!confirm("既読の通知を全て削除しますか？")) return;
     await fetch("/api/notifications", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
@@ -94,7 +95,7 @@ export default function NotificationsPage() {
             </Button>
           )}
           {notifications.some((n) => n.read) && (
-            <Button variant="ghost" size="sm" className="h-8 text-[12px] text-muted-foreground" onClick={deleteRead}>
+            <Button variant="ghost" size="sm" className="h-8 text-[12px] text-muted-foreground" onClick={() => setConfirmDeleteRead(true)}>
               既読を削除
             </Button>
           )}
@@ -192,6 +193,16 @@ export default function NotificationsPage() {
           })}
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmDeleteRead}
+        onOpenChange={setConfirmDeleteRead}
+        title="既読の通知を削除"
+        description="既読の通知を全て削除します。この操作は取り消せません。"
+        confirmLabel="削除"
+        variant="destructive"
+        onConfirm={deleteRead}
+      />
     </div>
   );
 }

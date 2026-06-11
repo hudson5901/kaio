@@ -316,7 +316,7 @@ export default function EbayListingPage() {
       ) : (
         <div className="border border-border/60 rounded-lg overflow-x-auto">
           {/* Table header */}
-          <div className="sticky top-0 z-10 grid grid-cols-[32px_36px_1fr_80px_80px_80px_80px_60px_50px] gap-0 px-3 py-2.5 border-b border-border/60 text-[11px] font-medium text-muted-foreground/70 uppercase tracking-wider bg-accent/30 backdrop-blur-sm">
+          <div className="sticky top-0 z-10 grid grid-cols-[32px_36px_1fr_80px] sm:grid-cols-[32px_36px_1fr_80px_80px_80px_80px_60px_50px] gap-0 px-3 py-2.5 border-b border-border/60 text-[11px] font-medium text-muted-foreground/70 uppercase tracking-wider bg-accent/30 backdrop-blur-sm">
             <span className="flex items-center">
               <button
                 onClick={toggleSelectAll}
@@ -333,12 +333,12 @@ export default function EbayListingPage() {
             </span>
             <span></span>
             <button onClick={() => toggleSort("title")} className="group flex items-center gap-1 text-left">商品名 <SortIcon active={sortKey === "title"} dir={sortDir} /></button>
-            <button onClick={() => toggleSort("mercariPrice")} className="group flex items-center gap-0.5 justify-end">仕入れ <SortIcon active={sortKey === "mercariPrice"} dir={sortDir} /></button>
-            <button onClick={() => toggleSort("ebayPrice")} className="group flex items-center gap-0.5 justify-end">eBay価格 <SortIcon active={sortKey === "ebayPrice"} dir={sortDir} /></button>
-            <button onClick={() => toggleSort("shipping")} className="group flex items-center gap-0.5 justify-end">送料 <SortIcon active={sortKey === "shipping"} dir={sortDir} /></button>
             <button onClick={() => toggleSort("profit")} className="group flex items-center gap-0.5 justify-end">利益 <SortIcon active={sortKey === "profit"} dir={sortDir} /></button>
-            <span className="text-center">確認</span>
-            <button onClick={() => toggleSort("ai")} className="group flex items-center gap-0.5 justify-end">AI <SortIcon active={sortKey === "ai"} dir={sortDir} /></button>
+            <button onClick={() => toggleSort("mercariPrice")} className="hidden sm:flex group items-center gap-0.5 justify-end">仕入れ <SortIcon active={sortKey === "mercariPrice"} dir={sortDir} /></button>
+            <button onClick={() => toggleSort("ebayPrice")} className="hidden sm:flex group items-center gap-0.5 justify-end">eBay価格 <SortIcon active={sortKey === "ebayPrice"} dir={sortDir} /></button>
+            <button onClick={() => toggleSort("shipping")} className="hidden sm:flex group items-center gap-0.5 justify-end">送料 <SortIcon active={sortKey === "shipping"} dir={sortDir} /></button>
+            <span className="hidden sm:block text-center">確認</span>
+            <button onClick={() => toggleSort("ai")} className="hidden sm:flex group items-center gap-0.5 justify-end">AI <SortIcon active={sortKey === "ai"} dir={sortDir} /></button>
           </div>
           {/* Table rows */}
           <div>
@@ -349,7 +349,7 @@ export default function EbayListingPage() {
               return (
                 <div
                   key={item.id}
-                  className={`grid grid-cols-[32px_36px_1fr_80px_80px_80px_80px_60px_50px] gap-0 px-3 py-2 items-center transition-colors ${
+                  className={`grid grid-cols-[32px_36px_1fr_80px] sm:grid-cols-[32px_36px_1fr_80px_80px_80px_80px_60px_50px] gap-0 px-3 py-2 items-center transition-colors ${
                     isSelected ? "bg-accent/60" : "hover:bg-accent/40"
                   } ${index > 0 ? "border-t border-border/30" : ""}`}
                 >
@@ -377,13 +377,13 @@ export default function EbayListingPage() {
                   <Link href={`/items/${item.id}?from=ebay-listing`} className="truncate pr-3">
                     <span className="text-[13px] font-medium hover:text-primary transition-colors">{item.mercariTitle}</span>
                   </Link>
-                  <span className="text-[13px] text-right tabular-nums text-muted-foreground">¥{(item.mercariPrice || 0).toLocaleString()}</span>
-                  <span className="text-[13px] text-right tabular-nums">{item.ebayPriceUsd ? `$${item.ebayPriceUsd}` : <span className="text-muted-foreground/30">--</span>}</span>
-                  <span className="text-[13px] text-right tabular-nums text-muted-foreground">{item.shippingCostUsd ? `$${item.shippingCostUsd.toFixed(1)}` : <span className="text-muted-foreground/30">--</span>}</span>
                   <span className={`text-[13px] text-right tabular-nums font-medium ${item.estimatedProfitUsd && item.estimatedProfitUsd > 0 ? "text-emerald-500" : item.estimatedProfitUsd ? "text-red-400" : ""}`}>
                     {item.estimatedProfitUsd != null ? `$${item.estimatedProfitUsd.toFixed(0)}` : <span className="text-muted-foreground/30">--</span>}
                   </span>
-                  <div className="flex justify-center">
+                  <span className="hidden sm:block text-[13px] text-right tabular-nums text-muted-foreground">¥{(item.mercariPrice || 0).toLocaleString()}</span>
+                  <span className="hidden sm:block text-[13px] text-right tabular-nums">{item.ebayPriceUsd ? `$${item.ebayPriceUsd}` : <span className="text-muted-foreground/30">--</span>}</span>
+                  <span className="hidden sm:block text-[13px] text-right tabular-nums text-muted-foreground">{item.shippingCostUsd ? `$${item.shippingCostUsd.toFixed(1)}` : <span className="text-muted-foreground/30">--</span>}</span>
+                  <div className="hidden sm:flex justify-center">
                     {item.listingScheduledAt ? (
                       <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500/15 text-emerald-500">
                         <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
@@ -394,7 +394,7 @@ export default function EbayListingPage() {
                       <span className="text-[11px] text-muted-foreground/40">--</span>
                     )}
                   </div>
-                  <span className={`text-[12px] text-right tabular-nums font-medium ${item.aiScore != null && item.aiScore >= 70 ? "text-emerald-500" : item.aiScore != null && item.aiScore >= 40 ? "text-amber-500" : item.aiScore != null ? "text-red-400" : ""}`}>
+                  <span className={`hidden sm:block text-[12px] text-right tabular-nums font-medium ${item.aiScore != null && item.aiScore >= 70 ? "text-emerald-500" : item.aiScore != null && item.aiScore >= 40 ? "text-amber-500" : item.aiScore != null ? "text-red-400" : ""}`}>
                     {item.aiScore != null ? item.aiScore : <span className="text-muted-foreground/30">--</span>}
                   </span>
                 </div>
