@@ -12,6 +12,13 @@ import {
   isEbayConfigured,
   isEbayUserTokenConfigured,
 } from "./client";
+import {
+  getMyeBaySelling,
+  getItemPictureURLs,
+  isTradingApiConfigured,
+  type TradingItem,
+  type TradingSoldItem,
+} from "./trading";
 
 // eBay Inventory API のレスポンス型
 interface EbayInventoryItem {
@@ -343,4 +350,131 @@ export async function importEbayListings(): Promise<{
   }
 
   return results;
+}
+
+/**
+ * Trading API (Auth'n'Auth) を使ったインポート
+ *
+ * GetMyeBaySelling で ActiveList + SoldList を取得し、DBにアップサート
+ */
+export async function importFromTradingApi(): Promise<{
+  imported: number;
+  updated: number;
+  soldMarked: number;
+  errors: string[];
+}> {
+  if (!isTradingApiConfigured()) {
+    throw new Error(
+      "Trading API が未設定です。EBAY_APP_ID, EBAY_DEV_ID, EBAY_CERT_ID, EBAY_AUTH_TOKEN を設定してください。"
+    );
+  }
+
+  const results = {
+    imported: 0,
+    updated: 0,
+    soldMarked: 0,
+    errors: [] as string[],
+  };
+
+  let activeItems: TradingItem[] = [];
+  let soldItems: TradingSoldItem[] = [];
+
+  try {
+    const data = await getMyeBaySelling();
+    activeItems = data.activeItems;
+    soldItems = data.soldItems;
+  } catch (err) {
+    results.errors.push(`GetMyeBaySelling エラー: ${err}`);
+    return results;
+  }
+
+  // ActiveList のアイテムをインポート
+  for (const item of activeItems) {
+    try {
+      await upsertTradingItem(item, "listed", results);
+    } catch (err) {
+      results.errors.push(`アイテムインポートエラー (${item.ItemID}): ${err}`);
+    }
+  }
+
+  // SoldList のアイテムをインポート (sold ステータス)
+  for (const item of soldItems) {
+    try {
+      await upsertTradingItem(item, "sold", results);
+    } catch (err) {
+      results.errors.push(`売約済みインポートエラー (${item.ItemID}): ${err}`);
+    }
+  }
+
+  return results;
+}
+
+async function upsertTradingItem(
+  item: TradingItem | TradingSoldItem,
+  status: "listed" | "sold",
+  results: { imported: number; updated: number; soldMarked: number; errors: string[] }
+) {
+  const existing = await db.query.items.findFirst({
+    where: eq(schema.items.ebayListingId, item.ItemID),
+  });
+
+  // GetMyeBaySelling はサムネイルのみ返すので、GetItem でフル画像を取得
+  let pictureURLs = item.PictureURL;
+  if (pictureURLs.length === 0 || (pictureURLs.length === 1 && pictureURLs[0].includes("s-l140"))) {
+    try {
+      const fullURLs = await getItemPictureURLs(item.ItemID);
+      if (fullURLs.length > 0) {
+        pictureURLs = fullURLs;
+      }
+    } catch {
+      // GetItem 失敗時はサムネイルで続行
+    }
+  }
+
+  const images = pictureURLs.length > 0 ? JSON.stringify(pictureURLs) : null;
+
+  if (existing) {
+    const updates: Record<string, unknown> = {
+      ebayTitle: item.Title,
+      ebayPriceUsd: item.CurrentPrice,
+      updatedAt: new Date().toISOString(),
+    };
+    if (images) {
+      updates.mercariImages = images;
+    }
+
+    // sold ステータスの場合のみ上書き (listed → sold は OK だが sold → listed は防ぐ)
+    if (status === "sold" && existing.ebayStatus !== "sold") {
+      updates.ebayStatus = "sold";
+      results.soldMarked++;
+    } else if (status === "listed" && existing.ebayStatus !== "sold") {
+      updates.ebayStatus = "listed";
+    }
+
+    await db
+      .update(schema.items)
+      .set(updates)
+      .where(eq(schema.items.id, existing.id));
+    results.updated++;
+  } else {
+    await db.insert(schema.items).values({
+      id: uuid(),
+      mercariUrl: "ebay-import",
+      mercariTitle: item.Title,
+      mercariPrice: 0,
+      mercariImages: images,
+      mercariStatus: "available",
+      ebayListingId: item.ItemID,
+      ebayTitle: item.Title,
+      ebayPriceUsd: item.CurrentPrice,
+      ebayStatus: status === "sold" ? "sold" : "listed",
+      decision: "list",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    results.imported++;
+    if (status === "sold") {
+      results.soldMarked++;
+    }
+  }
 }
