@@ -49,20 +49,38 @@ const FOOTER_HTML = `<hr/>
 </ul>
 <p>30-day returns accepted. Item must be returned in original condition.</p>`;
 
+/** 日本語訳フッター — 文言チェック用に英語フッターと同じ内容の日本語版 */
+const FOOTER_HTML_JA = `<hr/>
+<h3>配送</h3>
+<ul>
+<li>日本からEMS（国際スピード郵便）で発送</li>
+<li>お届け目安：米国・欧州まで3〜7営業日</li>
+<li>国際輸送に耐える保護材で丁寧に梱包</li>
+<li>追跡番号付き</li>
+</ul>
+<h3>ご注意</h3>
+<ul>
+<li>輸入関税・税金・手数料は購入者様のご負担となります</li>
+<li>購入前にお住まいの国の輸入規制をご確認ください</li>
+<li>モニター環境により実物と色味が多少異なる場合があります</li>
+</ul>
+<p>30日間の返品を承ります。商品は元の状態でご返送ください。</p>`;
+
 /**
  * AI生成の説明文をサニタイズ＋固定フッター付与
  */
-function finalizeDescription(raw: string): string {
-  let desc = raw
+function finalizeDescription(raw: string, lang: "en" | "ja" = "en"): string {
+  const shippingHeading = lang === "ja" ? "配送" : "Shipping";
+  const desc = raw
     // mercari/rakutenリンク除去
     .replace(/https?:\/\/[^\s"'<>]*mercari\.com[^\s"'<>]*/gi, "")
     .replace(/https?:\/\/[^\s"'<>]*rakuten\.co[^\s"'<>]*/gi, "")
-    // AI が Shipping/Important Notice を含めてしまった場合は除去
-    .replace(/<hr\s*\/?>[\s\S]*<h3>\s*Shipping\s*<\/h3>[\s\S]*$/i, "")
-    .replace(/<h3>\s*Shipping\s*<\/h3>[\s\S]*$/i, "")
+    // AI が Shipping/配送セクションを含めてしまった場合は除去
+    .replace(new RegExp(`<hr\\s*/?>[\\s\\S]*<h3>\\s*${shippingHeading}\\s*</h3>[\\s\\S]*$`, "i"), "")
+    .replace(new RegExp(`<h3>\\s*${shippingHeading}\\s*</h3>[\\s\\S]*$`, "i"), "")
     .trim();
 
-  return desc + "\n" + FOOTER_HTML;
+  return desc + "\n" + (lang === "ja" ? FOOTER_HTML_JA : FOOTER_HTML);
 }
 
 /**
@@ -213,8 +231,15 @@ DO NOT include Shipping or Important Notice sections — those are added automat
 - "Region/Country of Origin": ["Japan"]
 - "Age": ["Pre-1800"], ["1800-1899"], ["1900-1940"], ["Post-1940"], or ["Unknown"]
 
+## JAPANESE TRANSLATION (for the seller to verify wording)
+Provide a natural Japanese translation of your English output so the seller can confirm the English version is accurate. The Japanese is NOT for buyers — it's a back-translation for QA.
+
+- "titleJa": natural Japanese title that conveys the SAME meaning as your English title (no 80-char limit, use full kanji/kana naturally)
+- "descriptionJa": back-translate the English description into Japanese with the SAME HTML structure (same h3 headings, same table rows, same paragraph breaks). Translate every sentence. Do NOT include Shipping / Important Notice — added automatically.
+- "aspectsJa": same KEYS as "aspects" (English keys like "Type", "Color"), but VALUES translated to Japanese. e.g. {"Type": ["甲冑セット、兜、五月人形"], "Color": ["金", "橙", "黒"], "Primary Material": ["混合素材、金属、布"]}
+
 Respond with JSON:
-{"title":"...","description":"<h3>...</h3><p>...</p>...","aspects":{...}}`,
+{"title":"...","description":"<h3>...</h3><p>...</p>...","aspects":{...},"titleJa":"...","descriptionJa":"<h3>...</h3><p>...</p>...","aspectsJa":{...}}`,
     });
 
     const text = await callGemini(parts);
@@ -227,17 +252,24 @@ Respond with JSON:
 
     const generated = JSON.parse(jsonMatch[0]);
 
-    // タイトル: 80文字制限
+    // タイトル: 80文字制限（英語のみ。日本語訳はチェック用なので長さ制限なし）
     const title = (generated.title || "").slice(0, 80).trim();
+    const titleJa = (generated.titleJa || "").trim() || null;
 
     // 説明文: サニタイズ + 固定フッター付与
     const description = finalizeDescription(generated.description || "");
+    const descriptionJa = generated.descriptionJa
+      ? finalizeDescription(generated.descriptionJa, "ja")
+      : null;
 
     // aspectsをマージ（AI生成 > 既存）
     const mergedAspects = {
       ...existingAspects,
       ...(generated.aspects || {}),
     };
+    const aspectsJa = generated.aspectsJa && typeof generated.aspectsJa === "object"
+      ? generated.aspectsJa
+      : null;
 
     // Save to DB
     await db
@@ -246,6 +278,9 @@ Respond with JSON:
         ebayTitle: title,
         ebayDescription: description,
         ebayAspects: JSON.stringify(mergedAspects),
+        ebayTitleJa: titleJa,
+        ebayDescriptionJa: descriptionJa,
+        ebayAspectsJa: aspectsJa ? JSON.stringify(aspectsJa) : null,
         updatedAt: new Date().toISOString(),
       })
       .where(eq(schema.items.id, id));
@@ -255,6 +290,9 @@ Respond with JSON:
       title,
       description,
       aspects: mergedAspects,
+      titleJa,
+      descriptionJa,
+      aspectsJa,
     });
   } catch (error) {
     console.error("AI generation error:", error);
@@ -287,11 +325,19 @@ Respond with JSON:
 
     const fullHtmlDesc = finalizeDescription(htmlDesc);
 
+    // フォールバック時の日本語訳は元のメルカリ情報をそのまま流用（AI失敗時のチェック用フォールバック）
+    const titleJa = item.mercariTitle;
+    const descriptionJa = item.mercariDescription
+      ? finalizeDescription(`<p>${item.mercariDescription.replace(/\n/g, "</p><p>")}</p>`, "ja")
+      : null;
+
     await db
       .update(schema.items)
       .set({
         ebayTitle: title,
         ebayDescription: fullHtmlDesc,
+        ebayTitleJa: titleJa,
+        ebayDescriptionJa: descriptionJa,
         updatedAt: new Date().toISOString(),
       })
       .where(eq(schema.items.id, id));
@@ -300,6 +346,8 @@ Respond with JSON:
       success: true,
       title,
       description: fullHtmlDesc,
+      titleJa,
+      descriptionJa,
       fallback: true,
       error: String(error),
     });

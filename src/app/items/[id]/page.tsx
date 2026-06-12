@@ -420,7 +420,34 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
             {processedImages.length > 0 ? (
               <div className="grid grid-cols-4 gap-1.5 p-2.5">
                 {processedImages.map((path, i) => (
-                  <img key={i} src={path} alt="" onClick={() => setLightboxImage(path)} className="rounded-lg object-cover aspect-square w-full bg-black cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all" />
+                  <div key={i} className="relative group">
+                    <img src={path} alt="" onClick={() => setLightboxImage(path)} className="rounded-lg object-cover aspect-square w-full bg-black cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all" />
+                    <button
+                      type="button"
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        if (!confirm(`画像 ${i + 1} を削除します。よろしいですか？\n（切り抜きを再実行すれば作り直せます）`)) return;
+                        const res = await fetch(`/api/items/${item.id}`, {
+                          method: "PATCH",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ action: "remove_processed_image", index: i }),
+                        });
+                        if (res.ok) {
+                          setToast({ type: "success", text: "加工済み画像を削除しました" });
+                          await fetchItem();
+                        } else {
+                          const err = await res.json().catch(() => ({}));
+                          setToast({ type: "error", text: err.error || "削除に失敗しました" });
+                        }
+                      }}
+                      title="この画像を削除（切り抜き失敗など）"
+                      className="absolute top-1 right-1 w-6 h-6 rounded-full bg-red-600/90 text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center shadow-md hover:bg-red-600 z-10"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
                 ))}
               </div>
             ) : (
@@ -654,7 +681,13 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
                       <span className="tabular-nums text-red-400">-¥{(item.mercariPrice || 0).toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between text-xs">
-                      <span className="text-muted-foreground">EMS送料（{item.weightG ? `${item.weightG}g` : "2000g"}）</span>
+                      <span className="text-muted-foreground">
+                        FedEx送料（
+                        {costs?.chargeableWeightG
+                          ? `${costs.chargeableWeightG.toLocaleString()}g${costs.volumetricWeightG > costs.actualWeightG ? " 容積" : ""}`
+                          : item.weightG ? `${item.weightG}g` : "2000g"}
+                        ）
+                      </span>
                       <span className="tabular-nums text-red-400">
                         {costs
                           ? `-¥${costs.shippingCostJpy?.toLocaleString()}`
@@ -1358,7 +1391,7 @@ function EbayPreview({
                   {item.shippingCostUsd && (
                     <div className="flex text-sm">
                       <span className="text-gray-500 w-28 flex-shrink-0">Shipping</span>
-                      <span>US ${item.shippingCostUsd.toFixed(2)} (EMS International)</span>
+                      <span>US ${item.shippingCostUsd.toFixed(2)} (FedEx International Priority)</span>
                     </div>
                   )}
                 </div>
@@ -1481,9 +1514,74 @@ function EbayPreview({
                 <p className="text-sm text-gray-400 italic">No description generated yet</p>
               )}
             </div>
+
+            {/* Japanese translation (for wording QA) — collapsed by default */}
+            {(item.ebayTitleJa || item.ebayDescriptionJa || item.ebayAspectsJa) && (
+              <JapaneseTranslationPanel item={item} />
+            )}
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function JapaneseTranslationPanel({ item }: { item: Item }) {
+  const [open, setOpen] = useState(true);
+  let aspectsJa: Record<string, string[]> = {};
+  try { if (item.ebayAspectsJa) aspectsJa = JSON.parse(item.ebayAspectsJa); } catch { /* */ }
+  const hasAspectsJa = Object.keys(aspectsJa).length > 0;
+
+  return (
+    <div className="border-t border-gray-200 bg-amber-50/40">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="w-full px-5 py-3 flex items-center justify-between text-left hover:bg-amber-50/70 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <svg className="w-4 h-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 0 1 6.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+          </svg>
+          <span className="text-sm font-semibold text-gray-700">日本語訳（文言チェック用）</span>
+          <span className="text-[10px] text-gray-500">eBayには出品されません</span>
+        </div>
+        <svg className={`w-4 h-4 text-gray-500 transition-transform ${open ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+        </svg>
+      </button>
+      {open && (
+        <div className="px-5 pb-5 space-y-4">
+          {item.ebayTitleJa && (
+            <div>
+              <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1">タイトル</div>
+              <p className="text-base font-semibold text-gray-900 leading-snug">{item.ebayTitleJa}</p>
+            </div>
+          )}
+          {hasAspectsJa && (
+            <div>
+              <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Item specifics</div>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+                {Object.entries(aspectsJa).map(([key, values]) => (
+                  <div key={key} className="flex">
+                    <span className="text-gray-500 w-24 flex-shrink-0 text-xs">{key}</span>
+                    <span className="font-medium text-xs">{(values as string[]).join("、")}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {item.ebayDescriptionJa && (
+            <div>
+              <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Item description</div>
+              <div
+                className="text-sm text-gray-700 leading-relaxed prose prose-sm max-w-none"
+                dangerouslySetInnerHTML={{ __html: item.ebayDescriptionJa }}
+              />
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -73,6 +73,41 @@ export async function PATCH(
       }
     }
 
+    case "remove_processed_image": {
+      const index = Number(body.index);
+      if (!Number.isInteger(index) || index < 0) {
+        return NextResponse.json({ error: "Invalid index" }, { status: 400 });
+      }
+
+      const current: string[] = item.processedImages
+        ? JSON.parse(item.processedImages)
+        : [];
+      if (index >= current.length) {
+        return NextResponse.json({ error: "Index out of range" }, { status: 400 });
+      }
+
+      const removedUrl = current[index];
+      const next = current.filter((_, i) => i !== index);
+
+      await db
+        .update(schema.items)
+        .set({
+          processedImages: next.length > 0 ? JSON.stringify(next) : null,
+          updatedAt: new Date().toISOString(),
+        })
+        .where(eq(schema.items.id, id));
+
+      // Storage上の実ファイルも消す（失敗してもDB更新は成功扱い）
+      try {
+        const { removeProcessedImageFromStorage } = await import("@/lib/image/processor");
+        await removeProcessedImageFromStorage(removedUrl);
+      } catch (err) {
+        console.warn(`Failed to delete storage file for ${removedUrl}:`, err);
+      }
+
+      return NextResponse.json({ processedImages: next });
+    }
+
     case "calculate_costs": {
       const settings = await getSettings();
       const costs = await calculateCostsWithLiveRate({

@@ -132,6 +132,29 @@ async function uploadToStorage(
 }
 
 /**
+ * Supabase Storage上の加工済み画像URL → bucket内のパスを取り出す
+ * URL例: https://xxx.supabase.co/storage/v1/object/public/processed-images/{itemId}/{i}.jpg?v=...
+ */
+function extractStoragePath(publicUrl: string): string | null {
+  const marker = `/storage/v1/object/public/${BUCKET}/`;
+  const idx = publicUrl.indexOf(marker);
+  if (idx < 0) return null;
+  const tail = publicUrl.slice(idx + marker.length);
+  return tail.split("?")[0] || null;
+}
+
+/**
+ * Supabase Storage から加工済み画像を1枚削除
+ */
+export async function removeProcessedImageFromStorage(publicUrl: string): Promise<void> {
+  const path = extractStoragePath(publicUrl);
+  if (!path) return;
+  const supabase = getSupabase();
+  const { error } = await supabase.storage.from(BUCKET).remove([path]);
+  if (error) throw new Error(`Storage remove failed: ${error.message}`);
+}
+
+/**
  * Process all images for an item
  */
 export async function processItemImages(

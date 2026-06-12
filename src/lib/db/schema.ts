@@ -53,6 +53,9 @@ export const items = pgTable("items", {
   ebayPriceUsd: real("ebay_price_usd"),
   ebayTitle: text("ebay_title"),
   ebayDescription: text("ebay_description"),
+  ebayTitleJa: text("ebay_title_ja"),
+  ebayDescriptionJa: text("ebay_description_ja"),
+  ebayAspectsJa: text("ebay_aspects_ja"),
   ebayStatus: text("ebay_status", {
     enum: ["draft", "listed", "sold", "removed"]
   }).default("draft").notNull(),
