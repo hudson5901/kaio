@@ -189,17 +189,19 @@ export async function removeEbayListing(item: Item): Promise<void> {
     throw new Error(`Failed to withdraw offer: ${error}`);
   }
 
-  // SKU削除
-  const sku = `KAIO-${item.mercariId}`;
-  await fetch(
-    `${baseUrl}/sell/inventory/v1/inventory_item/${sku}`,
-    {
-      method: "DELETE",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    }
-  );
+  // SKU削除 (mercariId が無いインポート由来は SKU 不明のためスキップ)
+  if (item.mercariId) {
+    const sku = `KAIO-${item.mercariId}`;
+    await fetch(
+      `${baseUrl}/sell/inventory/v1/inventory_item/${sku}`,
+      {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+  }
 
   // DB更新
   await db

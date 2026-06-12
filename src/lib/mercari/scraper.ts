@@ -26,6 +26,11 @@ async function fetchWithJina(url: string, waitForSelector?: string): Promise<str
     Accept: "text/markdown",
     "X-Return-Format": "markdown",
   };
+  // API キーがあれば付与（anonymous の 20 RPM → 200 RPM）
+  const jinaKey = process.env.JINA_API_KEY;
+  if (jinaKey) {
+    headers["Authorization"] = `Bearer ${jinaKey}`;
+  }
   // メルカリのJS描画コンテンツを待つ
   if (waitForSelector) {
     headers["X-Wait-For-Selector"] = waitForSelector;

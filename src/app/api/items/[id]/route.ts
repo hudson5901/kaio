@@ -43,9 +43,12 @@ export async function PATCH(
   // アクション別の処理
   switch (action) {
     case "process_images": {
-      const imageUrls: string[] = item.mercariImages
-        ? JSON.parse(item.mercariImages)
-        : [];
+      let imageUrls: string[] = [];
+      try {
+        imageUrls = item.mercariImages ? JSON.parse(item.mercariImages) : [];
+      } catch {
+        return NextResponse.json({ error: "Invalid mercariImages JSON" }, { status: 400 });
+      }
       if (imageUrls.length === 0) {
         return NextResponse.json({ error: "No images to process" }, { status: 400 });
       }

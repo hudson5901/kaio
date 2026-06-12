@@ -25,6 +25,7 @@ export interface PipelineState {
 const defaultSteps: PipelineStep[] = [
   { id: "scrape", label: "検索・取得", status: "pending", processed: 0, total: 0, errors: [] },
   { id: "details", label: "詳細取得", status: "pending", processed: 0, total: 0, errors: [] },
+  { id: "classify", label: "兜カテゴリ分類", status: "pending", processed: 0, total: 0, errors: [] },
   { id: "images", label: "画像処理", status: "pending", processed: 0, total: 0, errors: [] },
   { id: "costs", label: "費用計算", status: "pending", processed: 0, total: 0, errors: [] },
 ];

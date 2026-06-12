@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Kaio - 刀転売管理",
-  description: "メルカリ→eBay 刀転売管理システム",
+  title: "Kaio - 甲冑転売管理",
+  description: "メルカリ→eBay 甲冑（兜・鎧）転売管理システム",
 };
 
 export default function RootLayout({

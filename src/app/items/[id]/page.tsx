@@ -326,8 +326,16 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
   }
 
   async function handleDelete() {
-    await fetch(`/api/items/${id}`, { method: "DELETE" });
-    window.location.href = backHref;
+    try {
+      const res = await fetch(`/api/items/${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        showItemToast("error", "削除に失敗しました");
+        return;
+      }
+      router.push(backHref);
+    } catch {
+      showItemToast("error", "削除に失敗しました（ネットワークエラー）");
+    }
   }
 
   async function handleClassify() {
@@ -876,7 +884,15 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
                     type="number"
                     defaultValue={val ?? ""}
                     className="h-8 text-sm"
-                    onBlur={(e) => handleAction("update", { [key]: parseFloat(e.target.value) || null })}
+                    onBlur={async (e) => {
+                      const raw = e.target.value;
+                      const parsed = raw === "" ? null : parseFloat(raw);
+                      const next = Number.isFinite(parsed as number) ? parsed : null;
+                      if (next === val) return; // 変更無しは送らない
+                      await handleAction("update", { [key]: next });
+                      // 寸法・重量変更で送料/利益が変わるので自動再計算
+                      await handleAction("calculate_costs");
+                    }}
                   />
                 </div>
               ))}

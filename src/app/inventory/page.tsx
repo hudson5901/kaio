@@ -36,10 +36,13 @@ export default function InventoryPage() {
 
   async function fetchItems() {
     setLoading(true);
-    const res = await fetch("/api/items");
-    const data: Item[] = await res.json();
-    setItems(data);
-    setLoading(false);
+    try {
+      const res = await fetch("/api/items");
+      if (!res.ok) return;
+      const data = await res.json();
+      setItems(Array.isArray(data) ? data : []);
+    } catch { /* network error, leave items unchanged */ }
+    finally { setLoading(false); }
   }
 
   async function handleSync() {

@@ -29,8 +29,14 @@ export default function SettingsPage() {
   const [apiStatus, setApiStatus] = useState<ApiStatus>({ ebay: false, removeBg: false, anthropic: false });
 
   useEffect(() => {
-    fetch("/api/settings").then(r => r.json()).then(setSettings).catch(() => {});
-    fetch("/api/exchange-rate").then(r => r.json()).then(setRateInfo).catch(() => {});
+    fetch("/api/settings")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d && typeof d === "object" && "profitMarginPercent" in d) setSettings(d); })
+      .catch(() => {});
+    fetch("/api/exchange-rate")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d?.rate) setRateInfo(d); })
+      .catch(() => {});
 
     // Check API key status from env (client-side check via build-time vars won't work, use server)
     setApiStatus({

@@ -205,12 +205,15 @@ export function calculateCosts(params: {
   let ebayPriceUsd: number;
   if (params.ebayPriceUsd && params.ebayPriceUsd > 0) {
     ebayPriceUsd = params.ebayPriceUsd;
-  } else {
+  } else if (mercariPriceJpy > 0) {
     const numerator =
       mercariPriceJpy * (1 + profitMargin) +
       shippingCostJpy * (1 + customsRate);
     const denominator = exchangeRate * profitCoefficient;
     ebayPriceUsd = Math.ceil(numerator / denominator);
+  } else {
+    // 仕入価格が 0 (eBay インポート分など) の場合は逆算しない
+    ebayPriceUsd = 0;
   }
 
   // --- 円換算売上 ---
