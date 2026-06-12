@@ -3,6 +3,8 @@ import { db, schema } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { getCategory, type KabutoCategory } from "@/lib/kabuto/categories";
 
+export const maxDuration = 300;
+
 const GEMINI_MODEL = "gemini-3.1-pro-preview";
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
