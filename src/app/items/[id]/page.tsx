@@ -910,9 +910,11 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
           {/* Actions - better visual weight */}
           <div className="space-y-2 pt-1">
             {item.ebayStatus === "draft" && (
-              <Button className="w-full gap-2 h-10 text-sm font-semibold shadow-sm shadow-primary/20" onClick={() => handleAction("list_on_ebay")} disabled={actionLoading === "list_on_ebay"}>
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3" /></svg>
-                {actionLoading === "list_on_ebay" ? "出品中..." : "eBayに出品する"}
+              <Button className="w-full gap-2 h-10 text-sm font-semibold shadow-sm shadow-primary/20" onClick={() => handleAction("list_on_ebay", { publish: false })} disabled={actionLoading === "list_on_ebay"}>
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487 18.549 2.799a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" /></svg>
+                {actionLoading === "list_on_ebay"
+                  ? (item.ebayOfferId ? "更新中..." : "下書き作成中...")
+                  : (item.ebayOfferId ? "eBay下書きを更新" : "eBayに下書き出品")}
               </Button>
             )}
             {item.ebayStatus === "listed" && (
@@ -1096,9 +1098,11 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
                 {actionLoading === "calculate_costs" ? "計算中..." : "再計算"}
               </Button>
               {item.ebayStatus === "draft" && (
-                <Button className="gap-2 h-10 text-sm font-semibold shadow-sm shadow-primary/20 px-6" onClick={() => handleAction("list_on_ebay")} disabled={actionLoading === "list_on_ebay"}>
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3" /></svg>
-                  {actionLoading === "list_on_ebay" ? "出品中..." : "eBayに出品する"}
+                <Button className="gap-2 h-10 text-sm font-semibold shadow-sm shadow-primary/20 px-6" onClick={() => handleAction("list_on_ebay", { publish: false })} disabled={actionLoading === "list_on_ebay"}>
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487 18.549 2.799a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" /></svg>
+                  {actionLoading === "list_on_ebay"
+                    ? (item.ebayOfferId ? "更新中..." : "下書き作成中...")
+                    : (item.ebayOfferId ? "eBay下書きを更新" : "eBayに下書き出品")}
                 </Button>
               )}
               {item.ebayStatus === "listed" && (

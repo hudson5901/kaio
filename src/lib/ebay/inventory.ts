@@ -6,12 +6,23 @@ import type { Item } from "@/lib/db/schema";
 import { mapItemToEbayListing } from "./mapping";
 
 /**
- * eBay Inventory API でアイテムを出品
+ * eBay Inventory API でアイテムを出品（下書き or 公開）
+ *
+ * options.publish:
+ *   true  → inventory_item + offer + publish (即時公開)
+ *   false → inventory_item + offer のみ (eBay側で下書き状態、Seller Hubで編集・公開可能)
+ *
+ * 同一SKUに既存のoffer (item.ebayOfferId) がある場合は PUT で更新する。
  */
-export async function createEbayListing(item: Item): Promise<{
-  listingId: string;
+export async function createEbayListing(
+  item: Item,
+  options: { publish?: boolean } = {}
+): Promise<{
+  listingId: string | null;
   offerId: string;
+  published: boolean;
 }> {
+  const publish = options.publish !== false; // default true
   const token = await getUserToken();
   const baseUrl = getBaseApiUrl();
 
@@ -73,59 +84,83 @@ export async function createEbayListing(item: Item): Promise<{
     merchantLocationKey: process.env.EBAY_LOCATION_KEY || "default",
   };
 
-  const createOfferRes = await fetch(
-    `${baseUrl}/sell/inventory/v1/offer`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-        "Content-Language": "en-US",
-      },
-      body: JSON.stringify(offer),
+  let offerId: string;
+  if (item.ebayOfferId) {
+    // 既存offerを更新 (PUT)
+    const updateOfferRes = await fetch(
+      `${baseUrl}/sell/inventory/v1/offer/${item.ebayOfferId}`,
+      {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          "Content-Language": "en-US",
+        },
+        body: JSON.stringify(offer),
+      }
+    );
+    if (!updateOfferRes.ok && updateOfferRes.status !== 204) {
+      const error = await updateOfferRes.text();
+      throw new Error(`Failed to update offer: ${error}`);
     }
-  );
-
-  if (!createOfferRes.ok) {
-    const error = await createOfferRes.text();
-    throw new Error(`Failed to create offer: ${error}`);
+    offerId = item.ebayOfferId;
+  } else {
+    // 新規offer作成 (POST)
+    const createOfferRes = await fetch(
+      `${baseUrl}/sell/inventory/v1/offer`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          "Content-Language": "en-US",
+        },
+        body: JSON.stringify(offer),
+      }
+    );
+    if (!createOfferRes.ok) {
+      const error = await createOfferRes.text();
+      throw new Error(`Failed to create offer: ${error}`);
+    }
+    const offerData = await createOfferRes.json();
+    offerId = offerData.offerId;
   }
 
-  const offerData = await createOfferRes.json();
-  const offerId = offerData.offerId;
+  let listingId: string | null = null;
+  if (publish) {
+    // 3. Offer を公開
+    const publishRes = await fetch(
+      `${baseUrl}/sell/inventory/v1/offer/${offerId}/publish`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
 
-  // 3. Offer を公開
-  const publishRes = await fetch(
-    `${baseUrl}/sell/inventory/v1/offer/${offerId}/publish`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
+    if (!publishRes.ok) {
+      const error = await publishRes.text();
+      throw new Error(`Failed to publish offer: ${error}`);
     }
-  );
 
-  if (!publishRes.ok) {
-    const error = await publishRes.text();
-    throw new Error(`Failed to publish offer: ${error}`);
+    const publishData = await publishRes.json();
+    listingId = publishData.listingId;
   }
-
-  const publishData = await publishRes.json();
-  const listingId = publishData.listingId;
 
   // DB更新
   await db
     .update(schema.items)
     .set({
-      ebayListingId: listingId,
+      ebayListingId: listingId ?? item.ebayListingId,
       ebayOfferId: offerId,
-      ebayStatus: "listed",
+      ebayStatus: publish ? "listed" : "draft",
       updatedAt: new Date().toISOString(),
     })
     .where(eq(schema.items.id, item.id));
 
-  return { listingId, offerId };
+  return { listingId, offerId, published: publish };
 }
 
 /**

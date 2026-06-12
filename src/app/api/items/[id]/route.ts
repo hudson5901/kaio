@@ -237,7 +237,8 @@ export async function PATCH(
 
     case "list_on_ebay": {
       const { createEbayListing } = await import("@/lib/ebay/inventory");
-      const result = await createEbayListing(item);
+      const publish = body.publish !== false; // default true (即時公開)
+      const result = await createEbayListing(item, { publish });
       return NextResponse.json(result);
     }
 
