@@ -245,10 +245,23 @@ export async function fetchItemDetails(mercariId: string, usdToJpy: number = FAL
     description = textBlocks.join("\n").trim().slice(0, 2000);
   }
 
-  // 出品者
-  const sellerPattern = /出品者[\s\S]*?\[([^\]]+)\]/;
-  const sellerMatch = sellerPattern.exec(markdown);
-  const seller = sellerMatch ? sellerMatch[1] : "";
+  // 出品者: 「出品者」セクション内の [...] 候補から、画像Markdown / ナビ文字を除外
+  let seller = "";
+  const sellerSection = /出品者[\s\S]{0,800}/.exec(markdown);
+  if (sellerSection) {
+    const candidatePattern = /\[([^\]]+)\]/g;
+    let m;
+    while ((m = candidatePattern.exec(sellerSection[0])) !== null) {
+      const candidate = m[1].trim();
+      // ゴミ除外: 画像Markdown / 純数字 / ナビゲーションフッター / 長すぎ・短すぎ
+      if (/^!?Image\s*\d/i.test(candidate)) continue;
+      if (/^\d+$/.test(candidate)) continue;
+      if (/会社概要|運営会社|プライバシー|利用規約|ヘルプ|ガイド|ログイン|マイページ/.test(candidate)) continue;
+      if (candidate.length < 1 || candidate.length > 40) continue;
+      seller = candidate;
+      break;
+    }
+  }
 
   // カテゴリー抽出: "### カテゴリー" セクション内のリンクテキストを連結
   let category = "";
