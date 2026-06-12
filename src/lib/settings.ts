@@ -21,7 +21,7 @@ const defaults: AppSettings = {
   adPercent: 5,
   customsDutyPercent: 10,
   salesTaxPercent: 6,
-  shippingDiscountPercent: 50,
+  shippingDiscountPercent: 0,
   defaultWeightG: 2000,
   autoSyncEnabled: false,
   autoSyncIntervalMinutes: 60,

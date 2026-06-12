@@ -10,10 +10,11 @@
  *   - 広告費         = eBay売上 × ad%                        ← 売上税込で請求、送料は含めない
  *   - 売上税remit    = price × salesTax                     ← buyer徴収分を州に納付 (パススルー)
  *   - 関税           = (price + 送料) × customs%             ← 税抜の販売価格 + 送料に対して
- *   - 送料           = FedEx IP テーブル (実重量と容積重量のmax)
+ *   - 送料           = eLogi FICP テーブル (実重量と容積重量のmax)
  *   - 仕入           = メルカリ価格
  *
- * 送料は FedEx International Priority の重量別テーブル (実重量と容積重量の max) で計算
+ * 送料は eLogi FICP (FedEx International Connect Plus) のアメリカ向け料金表で計算。
+ * 課金重量 = max(実重量, 容積重量)、容積重量 = (L+7)(W+7)(H+7)/5000g。
  */
 
 import { getExchangeRate } from "@/lib/exchange-rate";
@@ -21,35 +22,87 @@ import { getCategory } from "@/lib/kabuto/categories";
 
 const DEFAULT_EXCHANGE_RATE = 155;
 
-// FedEx International Priority 公開料金 概算 (日本→アメリカ, 2026年版, 円建て)
-// 参考: corporate.beforward.jp / FedEx 公開List Rate
-// 1kg=19,490 / 5kg=53,230 / 10kg=66,630 を実測値とし、補間/外挿で構築
-// 実契約があればこの 60〜80% 程度で済むので保守的見積もり
-const FEDEX_RATES_JPY: { maxWeightG: number; cost: number }[] = [
-  { maxWeightG: 500, cost: 11000 },
-  { maxWeightG: 1000, cost: 19490 },
-  { maxWeightG: 1500, cost: 27800 },
-  { maxWeightG: 2000, cost: 35000 },
-  { maxWeightG: 2500, cost: 41000 },
-  { maxWeightG: 3000, cost: 46000 },
-  { maxWeightG: 4000, cost: 50500 },
-  { maxWeightG: 5000, cost: 53230 },
-  { maxWeightG: 6000, cost: 56500 },
-  { maxWeightG: 7000, cost: 60000 },
-  { maxWeightG: 8000, cost: 63000 },
-  { maxWeightG: 9000, cost: 65000 },
-  { maxWeightG: 10000, cost: 66630 },
-  { maxWeightG: 15000, cost: 80000 },
-  { maxWeightG: 20000, cost: 95000 },
-  { maxWeightG: 25000, cost: 110000 },
-  { maxWeightG: 30000, cost: 125000 },
-  { maxWeightG: 40000, cost: 155000 },
-  { maxWeightG: 50000, cost: 185000 },
-  { maxWeightG: 60000, cost: 215000 },
-  { maxWeightG: 68000, cost: 235000 }, // IP上限
+// eLogi FICP (FedEx International Connect Plus) 輸出料金, 北米向け (米国)
+// 出典: eLogi会員専用送料目安表 (2025年11月版)
+// 円建て、0.5kg刻みで32.5kgまで、燃油サーチャージ込み
+const ELOGI_FICP_US_RATES_JPY: { maxWeightG: number; cost: number }[] = [
+  { maxWeightG: 500, cost: 3200 },
+  { maxWeightG: 1000, cost: 3600 },
+  { maxWeightG: 1500, cost: 3900 },
+  { maxWeightG: 2000, cost: 4200 },
+  { maxWeightG: 2500, cost: 4700 },
+  { maxWeightG: 3000, cost: 5400 },
+  { maxWeightG: 3500, cost: 5700 },
+  { maxWeightG: 4000, cost: 6200 },
+  { maxWeightG: 4500, cost: 7000 },
+  { maxWeightG: 5000, cost: 7600 },
+  { maxWeightG: 5500, cost: 9200 },
+  { maxWeightG: 6000, cost: 9400 },
+  { maxWeightG: 6500, cost: 9900 },
+  { maxWeightG: 7000, cost: 10100 },
+  { maxWeightG: 7500, cost: 10600 },
+  { maxWeightG: 8000, cost: 10900 },
+  { maxWeightG: 8500, cost: 11300 },
+  { maxWeightG: 9000, cost: 11600 },
+  { maxWeightG: 9500, cost: 13900 },
+  { maxWeightG: 10000, cost: 14200 },
+  { maxWeightG: 10500, cost: 14800 },
+  { maxWeightG: 11000, cost: 15100 },
+  { maxWeightG: 11500, cost: 15700 },
+  { maxWeightG: 12000, cost: 16000 },
+  { maxWeightG: 12500, cost: 18000 },
+  { maxWeightG: 13000, cost: 18400 },
+  { maxWeightG: 13500, cost: 19000 },
+  { maxWeightG: 14000, cost: 19300 },
+  { maxWeightG: 14500, cost: 19900 },
+  { maxWeightG: 15000, cost: 20300 },
+  { maxWeightG: 15500, cost: 20900 },
+  { maxWeightG: 16000, cost: 22900 },
+  { maxWeightG: 16500, cost: 23500 },
+  { maxWeightG: 17000, cost: 23900 },
+  { maxWeightG: 17500, cost: 24500 },
+  { maxWeightG: 18000, cost: 24900 },
+  { maxWeightG: 18500, cost: 25500 },
+  { maxWeightG: 19000, cost: 26000 },
+  { maxWeightG: 19500, cost: 26600 },
+  { maxWeightG: 20000, cost: 27000 },
+  { maxWeightG: 20500, cost: 27600 },
+  { maxWeightG: 21000, cost: 31900 },
+  { maxWeightG: 21500, cost: 32800 },
+  { maxWeightG: 22000, cost: 33500 },
+  { maxWeightG: 22500, cost: 34400 },
+  { maxWeightG: 23000, cost: 35100 },
+  { maxWeightG: 23500, cost: 36000 },
+  { maxWeightG: 24000, cost: 36600 },
+  { maxWeightG: 24500, cost: 37500 },
+  { maxWeightG: 25000, cost: 38200 },
+  { maxWeightG: 25500, cost: 39100 },
+  { maxWeightG: 26000, cost: 39800 },
+  { maxWeightG: 26500, cost: 40700 },
+  { maxWeightG: 27000, cost: 41400 },
+  { maxWeightG: 27500, cost: 42300 },
+  { maxWeightG: 28000, cost: 43000 },
+  { maxWeightG: 28500, cost: 43900 },
+  { maxWeightG: 29000, cost: 44600 },
+  { maxWeightG: 29500, cost: 45500 },
+  { maxWeightG: 30000, cost: 46100 },
+  { maxWeightG: 30500, cost: 47000 },
+  { maxWeightG: 31000, cost: 47700 },
+  { maxWeightG: 31500, cost: 48600 },
+  { maxWeightG: 32000, cost: 49300 },
+  { maxWeightG: 32500, cost: 50200 },
 ];
-// 68kg超は1kgあたり ¥3500 で外挿（IPFサービス相当）
-const FEDEX_OVER_LIMIT_PER_KG = 3500;
+
+// 33kg以上は重量帯ごとの 1kgあたり料金 × 請求重量 で計算
+const ELOGI_FICP_US_PER_KG_JPY: { maxWeightKg: number; perKg: number }[] = [
+  { maxWeightKg: 44, perKg: 1561 },
+  { maxWeightKg: 70, perKg: 1453 },
+  { maxWeightKg: 99, perKg: 1435 },
+  { maxWeightKg: 299, perKg: 1439 },
+  { maxWeightKg: 499, perKg: 1358 },
+  { maxWeightKg: 999, perKg: 1338 },
+  { maxWeightKg: 99999, perKg: 1334 },
+];
 
 // デフォルトの料率
 const DEFAULT_EBAY_FEE_RATE = 0.16;       // 16%
@@ -103,18 +156,22 @@ function calculateVolumetricWeight(
 }
 
 /**
- * FedEx International Priority 送料を計算（円）
- * 68kg超は1kgあたり ¥3500 で外挿
+ * eLogi FICP (FedEx International Connect Plus) アメリカ向け送料を計算（円）
+ * 32.5kg以下はテーブル参照、それ以上は重量帯ごとの1kgあたり料金を採用。
  */
-function calculateFedexShipping(weightG: number): number {
-  for (const rate of FEDEX_RATES_JPY) {
+function calculateElogiFicpUsShipping(weightG: number): number {
+  for (const rate of ELOGI_FICP_US_RATES_JPY) {
     if (weightG <= rate.maxWeightG) {
       return rate.cost;
     }
   }
-  const lastTier = FEDEX_RATES_JPY[FEDEX_RATES_JPY.length - 1];
-  const overKg = (weightG - lastTier.maxWeightG) / 1000;
-  return lastTier.cost + Math.ceil(overKg) * FEDEX_OVER_LIMIT_PER_KG;
+  const weightKg = Math.ceil(weightG / 1000);
+  for (const tier of ELOGI_FICP_US_PER_KG_JPY) {
+    if (weightKg <= tier.maxWeightKg) {
+      return weightKg * tier.perKg;
+    }
+  }
+  return weightKg * 1334;
 }
 
 function round2(n: number): number {
@@ -191,7 +248,8 @@ export function calculateCosts(params: {
   // FedEx は実重量と容積重量の高い方を課金重量とする
   const chargeableWeight = Math.max(actualWeight, volumetricWeight);
 
-  // --- 送料 (FedEx テーブル × 割引率 or 手動上書き) ---
+  // --- 送料 (eLogi FICP テーブル × 割引率 or 手動上書き) ---
+  // eLogi 生料金が既に大幅割引込みなので、shippingDiscountRate は微調整用 (デフォルト0)
   const override = params.shippingCostUsdOverride;
   const discountRate = Math.min(
     Math.max(params.shippingDiscountRate ?? 0, 0),
@@ -200,7 +258,7 @@ export function calculateCosts(params: {
   const shippingCostJpy =
     override != null && Number.isFinite(override) && override >= 0
       ? override * exchangeRate
-      : calculateFedexShipping(chargeableWeight) * (1 - discountRate);
+      : calculateElogiFicpUsShipping(chargeableWeight) * (1 - discountRate);
   const shippingCostUsd = shippingCostJpy / exchangeRate;
 
   // --- eBay販売価格 ---

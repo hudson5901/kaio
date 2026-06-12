@@ -834,7 +834,7 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
                     </div>
                     <div className="flex justify-between text-xs">
                       <span className="text-muted-foreground">
-                        FedEx送料（
+                        eLogi送料（
                         {costs?.chargeableWeightG
                           ? `${costs.chargeableWeightG.toLocaleString()}g${costs.volumetricWeightG > costs.actualWeightG ? " 容積" : ""}`
                           : item.weightG ? `${item.weightG}g` : "2000g"}
@@ -1584,7 +1584,7 @@ function EbayPreview({
                   {item.shippingCostUsd && (
                     <div className="flex text-sm">
                       <span className="text-gray-500 w-28 flex-shrink-0">Shipping</span>
-                      <span>US ${item.shippingCostUsd.toFixed(2)} (FedEx International Priority)</span>
+                      <span>US ${item.shippingCostUsd.toFixed(2)} (eLogi FedEx)</span>
                     </div>
                   )}
                 </div>
