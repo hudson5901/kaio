@@ -12,74 +12,83 @@ You write professional, compelling eBay listings that drive sales. Your style is
 - Confident and knowledgeable about Japanese armor terminology
 - Honest about condition (builds trust and reduces returns)
 - SEO-optimized titles that use every character wisely
-- Clean HTML descriptions that look professional on both desktop and mobile
 
-REFERENCE — Here is one of your best-selling listings for style/format reference:
+REFERENCE — Standard output format for the item-specific section (everything else is added automatically).
+All listings follow this exact format. Fill ONLY the bracketed dynamic values for each item.
 
-TITLE: "Vintage Japanese Samurai Helmet MENPO Antique Hideyoshi Kabuto Armor Yoroi"
+[Age] Edo Period Style
+[Material] Iron, Lacquer
+[Artist] Unknown
+[Size Approx.]
+W31 × D25 × H26 cm
+Only included Kabuto
 
-DESCRIPTION (item-specific part only — Shipping/Notice sections are added automatically):
-<h3>Authentic Japanese Samurai Menpo (Face Guard)</h3>
-<p>A striking piece of Japanese samurai armor history. This menpo features detailed craftsmanship with a fierce expression, characteristic of Edo-period facial armor designed to intimidate opponents on the battlefield. The piece shows beautiful patina and aging consistent with its age.</p>
-<table>
-<tr><td><strong>Type</strong></td><td>Menpo (Face Guard)</td></tr>
-<tr><td><strong>Period/Era</strong></td><td>Edo Period Style</td></tr>
-<tr><td><strong>Material</strong></td><td>Iron, Lacquer</td></tr>
-<tr><td><strong>Condition</strong></td><td>Good vintage condition with age-appropriate wear</td></tr>
-</table>
-<h3>Condition Details</h3>
-<p>This menpo is in good vintage condition with natural aging and patina. There are minor scratches and wear consistent with age. The lacquer shows some crazing typical of antique pieces. This is a display/collectible piece and is not intended for wearing.</p>
-<h3>Measurements</h3>
-<p>Approximately 20cm x 18cm (7.9" x 7.1"). Weight: approximately 800g (1.8 lbs).</p>`;
+[Description]
+This is an antique Japanese samurai helmet, known as a kabuto.
+It features a Momonari-style design, a classic helmet shape.
+Please check all photos carefully before purchasing.`;
 
-/** 固定フッター — 全リスティングに統一付与 */
+/** 固定フッター (英語) — 全リスティングに統一付与 */
 const FOOTER_HTML = `<hr/>
-<h3>Shipping</h3>
-<ul>
-<li>Ships from Japan via FedEx International Priority</li>
-<li>Estimated delivery: 3-7 business days to USA/Europe</li>
-<li>Carefully packed with protective materials for safe international shipping</li>
-<li>Tracking number provided</li>
-</ul>
-<h3>Important Notice</h3>
-<ul>
-<li>Import duties, taxes, and charges are the buyer's responsibility</li>
-<li>Please check your country's import regulations before purchasing</li>
-<li>Colors may vary slightly due to monitor settings</li>
-</ul>
-<p>30-day returns accepted. Item must be returned in original condition.</p>`;
+<p><strong>[Shipping]</strong></p>
+<p>We ship from Japan using FedEx, DHL, UPS, or Japan Post, depending on the destination and shipping conditions.</p>
+<p>We usually ship within 3–10 business days after receiving cleared payment.</p>
+<p>Delivery may take longer depending on customs clearance, local delivery conditions, or transportation delays in your country.</p>
+<p><strong>[International Buyers]</strong></p>
+<p><strong>United States:</strong> Import duties and fees are included when shipped under eBay's DDP process.</p>
+<p><strong>Other Countries:</strong> Import duties, taxes, customs fees, or other charges are not included in the item price or shipping cost. These charges are the buyer's responsibility.</p>
+<p>Please check with your country's customs office before purchasing if you are unsure about possible additional costs.</p>
+<p><strong>[Customs Declaration]</strong></p>
+<p>We declare the item accurately and at the actual purchase value.</p>
+<p>We do not mark items as "gifts" or declare a lower value, as this is prohibited by international customs regulations.</p>
+<p><strong>[After Purchase]</strong></p>
+<p>Please contact us if there are any problems after you receive the item.</p>
+<p>We will do our best to resolve the issue.</p>
+<p>We promise to pack your item carefully.</p>
+<p>If you are looking for other Japanese antiques or samurai items, please feel free to contact us.</p>
+<p>We may be able to find them for you.</p>`;
 
-/** 日本語訳フッター — 文言チェック用に英語フッターと同じ内容の日本語版 */
+/** 固定フッター (日本語) — 文言チェック用 */
 const FOOTER_HTML_JA = `<hr/>
-<h3>配送</h3>
-<ul>
-<li>日本からFedEx International Priority で発送</li>
-<li>お届け目安：米国・欧州まで3〜7営業日</li>
-<li>国際輸送に耐える保護材で丁寧に梱包</li>
-<li>追跡番号付き</li>
-</ul>
-<h3>ご注意</h3>
-<ul>
-<li>輸入関税・税金・手数料は購入者様のご負担となります</li>
-<li>購入前にお住まいの国の輸入規制をご確認ください</li>
-<li>モニター環境により実物と色味が多少異なる場合があります</li>
-</ul>
-<p>30日間の返品を承ります。商品は元の状態でご返送ください。</p>`;
+<p><strong>[配送]</strong></p>
+<p>配送先と輸送状況に応じて、FedEx、DHL、UPS、または日本郵便で日本から発送します。</p>
+<p>通常はご入金確認後3〜10営業日以内に発送します。</p>
+<p>通関、配送状況、輸送遅延により、到着が遅れる場合があります。</p>
+<p><strong>[海外バイヤーへの案内]</strong></p>
+<p><strong>米国向け:</strong> eBayのDDPプロセスで発送する場合、輸入関税および手数料は商品代金に含まれます。</p>
+<p><strong>その他の国:</strong> 輸入関税・税金・通関手数料などは商品代金および送料に含まれません。これらはお客様のご負担となります。</p>
+<p>追加費用についてご不明な点があれば、購入前にお住まいの国の税関にご確認ください。</p>
+<p><strong>[関税申告について]</strong></p>
+<p>商品は実際の購入価格で正確に申告します。</p>
+<p>国際税関規則違反のため、商品を「ギフト」として申告したり、低い金額で申告することはいたしません。</p>
+<p><strong>[ご購入後]</strong></p>
+<p>商品到着後に問題があれば、お気軽にご連絡ください。</p>
+<p>最善を尽くして解決いたします。</p>
+<p>大切に梱包してお送りいたします。</p>
+<p>他に日本のアンティークや侍関連品をお探しでしたら、お気軽にご相談ください。</p>
+<p>お探しできるかもしれません。</p>`;
 
 /**
  * AI生成の説明文をサニタイズ＋固定フッター付与
  */
 function finalizeDescription(raw: string, lang: "en" | "ja" = "en"): string {
-  const shippingHeading = lang === "ja" ? "配送" : "Shipping";
-  const desc = raw
-    // mercari/rakutenリンク除去
+  const shippingMarkers = lang === "ja"
+    ? ["[配送]", "[海外バイヤー", "[関税申告", "[ご購入後]"]
+    : ["[Shipping]", "[International Buyers]", "[Customs Declaration]", "[After Purchase]"];
+  let desc = raw
     .replace(/https?:\/\/[^\s"'<>]*mercari\.com[^\s"'<>]*/gi, "")
     .replace(/https?:\/\/[^\s"'<>]*rakuten\.co[^\s"'<>]*/gi, "")
-    // AI が Shipping/配送セクションを含めてしまった場合は除去
-    .replace(new RegExp(`<hr\\s*/?>[\\s\\S]*<h3>\\s*${shippingHeading}\\s*</h3>[\\s\\S]*$`, "i"), "")
-    .replace(new RegExp(`<h3>\\s*${shippingHeading}\\s*</h3>[\\s\\S]*$`, "i"), "")
     .trim();
-
+  // AI が誤って固定フッター部分まで生成した場合、最初のフッター見出し以降を切り捨て
+  for (const marker of shippingMarkers) {
+    const idx = desc.indexOf(marker);
+    if (idx > 0) {
+      // 直前の <hr/> や <strong> 開きタグも巻き込んで切る
+      const cutTo = Math.max(0, desc.lastIndexOf("<", idx));
+      desc = desc.slice(0, cutTo).trim();
+      break;
+    }
+  }
   return desc + "\n" + (lang === "ja" ? FOOTER_HTML_JA : FOOTER_HTML);
 }
 
@@ -207,20 +216,25 @@ export async function POST(
 - Pack with SEO keywords: Samurai, Helmet, Kabuto, Armor, Yoroi
 - NO special characters, NO price, NO exclamation marks
 
-## DESCRIPTION RULES (100% English HTML)
-- Write ENTIRELY in English — translate ALL Japanese text
-- Describe what you SEE in the photos (colors, materials, decorations, damages)
-- Do NOT invent details not visible in photos or mentioned in description
-- Do NOT include mercari.com URLs or references to other marketplaces
-- Use simple HTML only: h3, p, strong, ul, li, table, tr, td, hr
+## DESCRIPTION RULES (100% English HTML, FIXED TEMPLATE — fill only the bracketed values)
 
-Sections (follow the reference listing format exactly):
-1. **Opening heading + 2-3 sentences** — What is this piece? Why is it special?
-2. **Item Details table** — Type, Period/Era, Material, Maker (if known), Included Items, Condition
-3. **Condition Details** — Honest 2-3 sentences from Japanese description + what you see in photos
-4. **Measurements** — cm AND inches, g AND lbs (if available)
+You MUST produce the description in this EXACT structure. The HTML below is the template;
+replace ONLY the bracketed values with what fits THIS specific item.
 
-DO NOT include Shipping or Important Notice sections — those are added automatically.
+<p><strong>[Age]</strong> {era e.g. "Edo Period Style", "Meiji Period", "Showa Era", "Pre-1800", "1900-1940"}</p>
+<p><strong>[Material]</strong> {main materials, comma separated, e.g. "Iron, Lacquer", "Mixed Materials", "Iron, Silk, Gold Leaf"}</p>
+<p><strong>[Artist]</strong> {maker name from the Japanese title/description if any, otherwise "Unknown"}</p>
+<p><strong>[Size Approx.]</strong></p>
+<p>W{width} × D{depth} × H{height} cm<br/>{what is included, e.g. "Only included Kabuto", "Kabuto + Yoroi Set", "Helmet, Yumi, Tachi"}</p>
+<p><strong>[Description]</strong></p>
+<p>{Sentence 1: What this piece is in plain English.}<br/>{Sentence 2: A distinguishing feature you actually see in the photos (style, decoration, condition).}<br/>{Sentence 3 (optional): Honest condition note. End with "Please check all photos carefully before purchasing."}</p>
+
+RULES:
+- Write entirely in English (translate every Japanese fragment).
+- Describe what you SEE in the photos. Don't invent details.
+- Don't include mercari.com URLs or other marketplace references.
+- DO NOT include Shipping / International Buyers / Customs Declaration / After Purchase sections — those are added automatically.
+- If a dimension is missing, omit that letter (e.g. "W31 × H26 cm") rather than guessing.
 
 ## ASPECTS (Item Specifics) — each value is a string array
 - "Type": e.g. ["Kabuto"], ["Yoroi Set"], ["Menpo"]
@@ -235,7 +249,7 @@ DO NOT include Shipping or Important Notice sections — those are added automat
 Provide a natural Japanese translation of your English output so the seller can confirm the English version is accurate. The Japanese is NOT for buyers — it's a back-translation for QA.
 
 - "titleJa": natural Japanese title that conveys the SAME meaning as your English title (no 80-char limit, use full kanji/kana naturally)
-- "descriptionJa": back-translate the English description into Japanese with the SAME HTML structure (same h3 headings, same table rows, same paragraph breaks). Translate every sentence. Do NOT include Shipping / Important Notice — added automatically.
+- "descriptionJa": back-translate the English description into Japanese with the EXACT SAME template structure ([Age]/[Material]/[Artist]/[Size Approx.]/[Description] sections, same paragraph breaks). Use the same brackets but translate the labels (e.g. <strong>[時代]</strong>, <strong>[素材]</strong>, <strong>[作家]</strong>, <strong>[サイズ目安]</strong>, <strong>[説明]</strong>). Do NOT include 配送 / 海外バイヤー / 関税申告 / ご購入後 sections — added automatically.
 - "aspectsJa": same KEYS as "aspects" (English keys like "Type", "Color"), but VALUES translated to Japanese. e.g. {"Type": ["甲冑セット、兜、五月人形"], "Color": ["金", "橙", "黒"], "Primary Material": ["混合素材、金属、布"]}
 
 Respond with JSON:
