@@ -666,16 +666,36 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
                       <span className="tabular-nums">{item.ebayPriceUsd ? `$${item.ebayPriceUsd}` : "-"}</span>
                     </div>
                     {costs && (
-                      <div className="flex justify-between text-xs">
-                        <span className="text-muted-foreground">円換算（$1 = ¥{costs.exchangeRate}）</span>
-                        <span className="tabular-nums font-medium">¥{costs.revenueJpy?.toLocaleString()}</span>
-                      </div>
+                      <>
+                        <div className="flex justify-between text-xs">
+                          <span className="text-muted-foreground">eBay売上税 (6%)</span>
+                          <span className="tabular-nums text-emerald-400">+${costs.salesTaxUsd?.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between text-xs pt-0.5">
+                          <span className="text-muted-foreground font-medium">eBay売上</span>
+                          <span className="tabular-nums font-medium">
+                            ${((item.ebayPriceUsd || 0) + (costs.salesTaxUsd || 0)).toFixed(2)}
+                            <span className="text-muted-foreground ml-1.5">(¥{((costs.revenueJpy || 0) + (costs.salesTaxJpy || 0)).toLocaleString()})</span>
+                          </span>
+                        </div>
+                      </>
                     )}
 
                     <div className="h-px bg-border my-1.5" />
 
                     {/* 経費セクション */}
                     <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider pb-1">経費</p>
+                    {[
+                      { label: "広告費 (eBay売上の5%)", usd: costs?.adCostUsd ?? item.adCostUsd, jpy: costs?.adCostJpy },
+                      { label: "eBay手数料 (eBay売上の16%)", usd: costs?.ebayFeeUsd ?? item.ebayFeeUsd, jpy: costs?.ebayFeeJpy },
+                    ].map(({ label, usd, jpy }) => (
+                      <div key={label} className="flex justify-between text-xs">
+                        <span className="text-muted-foreground">{label}</span>
+                        <span className="tabular-nums text-red-400">
+                          {jpy ? `-¥${jpy.toLocaleString()}` : usd ? `-$${usd}` : "-"}
+                        </span>
+                      </div>
+                    ))}
                     <div className="flex justify-between text-xs">
                       <span className="text-muted-foreground">メルカリ仕入れ</span>
                       <span className="tabular-nums text-red-400">-¥{(item.mercariPrice || 0).toLocaleString()}</span>
@@ -695,19 +715,18 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
                         }
                       </span>
                     </div>
-                    {[
-                      { label: "eBay手数料 (16%, 売上税込)", usd: costs?.ebayFeeUsd ?? item.ebayFeeUsd, jpy: costs?.ebayFeeJpy },
-                      { label: "広告費 (5%, 売上税込)", usd: costs?.adCostUsd ?? item.adCostUsd, jpy: costs?.adCostJpy },
-                      { label: "売上税納付 (6%)", usd: costs?.salesTaxUsd, jpy: costs?.salesTaxJpy },
-                      { label: "関税 (10%)", usd: costs?.customsDutyUsd ?? item.customsDutyUsd, jpy: costs?.customsDutyJpy },
-                    ].map(({ label, usd, jpy }) => (
-                      <div key={label} className="flex justify-between text-xs">
-                        <span className="text-muted-foreground">{label}</span>
-                        <span className="tabular-nums text-red-400">
-                          {jpy ? `-¥${jpy.toLocaleString()}` : usd ? `-$${usd}` : "-"}
-                        </span>
-                      </div>
-                    ))}
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">関税 ((eBay売上+送料)の10%)</span>
+                      <span className="tabular-nums text-red-400">
+                        {costs?.customsDutyJpy ? `-¥${costs.customsDutyJpy.toLocaleString()}` : item.customsDutyUsd ? `-$${item.customsDutyUsd}` : "-"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">eBay売上税納付 (6%)</span>
+                      <span className="tabular-nums text-red-400">
+                        {costs?.salesTaxJpy ? `-¥${costs.salesTaxJpy.toLocaleString()}` : "-"}
+                      </span>
+                    </div>
 
                     {costs && (
                       <>
