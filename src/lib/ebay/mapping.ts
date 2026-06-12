@@ -65,7 +65,7 @@ export function mapItemToEbayListing(item: Item): EbayListingData {
   }
 
   // eBayカテゴリID
-  let categoryId = "11644";
+  let categoryId = "262317";
   if (item.kabutoCategory) {
     const category = getCategory(item.kabutoCategory as KabutoCategory);
     if (category) {

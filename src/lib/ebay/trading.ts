@@ -156,23 +156,16 @@ export async function addFixedPriceItem(item: {
         <ShippingType>Flat</ShippingType>
         <ShippingServiceOptions>
           <ShippingServicePriority>1</ShippingServicePriority>
-          <ShippingService>FedExInternationalPriority</ShippingService>
+          <ShippingService>ExpeditedShippingFromOutsideUS</ShippingService>
           <ShippingServiceCost currencyID="USD">${item.shippingCostUsd.toFixed(2)}</ShippingServiceCost>
         </ShippingServiceOptions>
-        <InternationalShippingServiceOption>
-          <ShippingServicePriority>1</ShippingServicePriority>
-          <ShippingService>FedExInternationalPriority</ShippingService>
-          <ShippingServiceCost currencyID="USD">${item.shippingCostUsd.toFixed(2)}</ShippingServiceCost>
-          <ShipToLocation>Worldwide</ShipToLocation>
-        </InternationalShippingServiceOption>
       </ShippingDetails>
       <ReturnPolicy>
         <ReturnsAcceptedOption>ReturnsAccepted</ReturnsAcceptedOption>
         <RefundOption>MoneyBack</RefundOption>
         <ReturnsWithinOption>Days_30</ReturnsWithinOption>
         <ShippingCostPaidByOption>Buyer</ShippingCostPaidByOption>
-      </ReturnPolicy>
-      <PaymentMethods>PayPal</PaymentMethods>`;
+      </ReturnPolicy>`;
 
   const xmlBody = `<Item>
     <Title>${xmlEscape(item.title.slice(0, 80))}</Title>
