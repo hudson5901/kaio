@@ -174,49 +174,52 @@ export async function addFixedPriceItem(item: {
   // Business Policies は個別に設定可能。設定されたものは SellerProfiles で送り、
   // 設定されてないものはインラインで補完。Payment は eBay Managed Payments 必須
   // なのでインライン記述は廃止 (PayPal は無効)。
-  const profilesParts: string[] = [];
-  if (shipProfile) {
-    profilesParts.push(
-      `<SellerShippingProfile><ShippingProfileID>${shipProfile}</ShippingProfileID></SellerShippingProfile>`
-    );
-  }
-  if (payProfile) {
-    profilesParts.push(
-      `<SellerPaymentProfile><PaymentProfileID>${payProfile}</PaymentProfileID></SellerPaymentProfile>`
-    );
-  }
-  if (retProfile) {
-    profilesParts.push(
-      `<SellerReturnProfile><ReturnProfileID>${retProfile}</ReturnProfileID></SellerReturnProfile>`
-    );
-  }
-  const sellerProfilesXml = profilesParts.length
-    ? `<SellerProfiles>${profilesParts.join("")}</SellerProfiles>`
-    : "";
+  // useShipProfile=false なら shipping profile を外し inline ShippingDetails で出す (フォールバック用)
+  const buildPoliciesXml = (opts: { useShipProfile: boolean }) => {
+    const profilesParts: string[] = [];
+    if (shipProfile && opts.useShipProfile) {
+      profilesParts.push(
+        `<SellerShippingProfile><ShippingProfileID>${shipProfile}</ShippingProfileID></SellerShippingProfile>`
+      );
+    }
+    if (payProfile) {
+      profilesParts.push(
+        `<SellerPaymentProfile><PaymentProfileID>${payProfile}</PaymentProfileID></SellerPaymentProfile>`
+      );
+    }
+    if (retProfile) {
+      profilesParts.push(
+        `<SellerReturnProfile><ReturnProfileID>${retProfile}</ReturnProfileID></SellerReturnProfile>`
+      );
+    }
+    const sellerProfilesXml = profilesParts.length
+      ? `<SellerProfiles>${profilesParts.join("")}</SellerProfiles>`
+      : "";
 
-  // Shipping Policy が未設定ならインライン送料を送る
-  const inlineShippingXml = !shipProfile
-    ? `<ShippingDetails>
-        <ShippingType>Flat</ShippingType>
-        <ShippingServiceOptions>
-          <ShippingServicePriority>1</ShippingServicePriority>
-          <ShippingService>ExpeditedShippingFromOutsideUS</ShippingService>
-          <ShippingServiceCost currencyID="USD">${item.shippingCostUsd.toFixed(2)}</ShippingServiceCost>
-        </ShippingServiceOptions>
-      </ShippingDetails>`
-    : "";
+    // Shipping Policy 未使用ならインライン送料を送る
+    const inlineShippingXml = !(shipProfile && opts.useShipProfile)
+      ? `<ShippingDetails>
+          <ShippingType>Flat</ShippingType>
+          <ShippingServiceOptions>
+            <ShippingServicePriority>1</ShippingServicePriority>
+            <ShippingService>ExpeditedShippingFromOutsideUS</ShippingService>
+            <ShippingServiceCost currencyID="USD">${item.shippingCostUsd.toFixed(2)}</ShippingServiceCost>
+          </ShippingServiceOptions>
+        </ShippingDetails>`
+      : "";
 
-  // Return Policy が未設定ならインライン (30日返品)
-  const inlineReturnXml = !retProfile
-    ? `<ReturnPolicy>
-        <ReturnsAcceptedOption>ReturnsAccepted</ReturnsAcceptedOption>
-        <RefundOption>MoneyBack</RefundOption>
-        <ReturnsWithinOption>Days_30</ReturnsWithinOption>
-        <ShippingCostPaidByOption>Buyer</ShippingCostPaidByOption>
-      </ReturnPolicy>`
-    : "";
+    // Return Policy が未設定ならインライン (30日返品)
+    const inlineReturnXml = !retProfile
+      ? `<ReturnPolicy>
+          <ReturnsAcceptedOption>ReturnsAccepted</ReturnsAcceptedOption>
+          <RefundOption>MoneyBack</RefundOption>
+          <ReturnsWithinOption>Days_30</ReturnsWithinOption>
+          <ShippingCostPaidByOption>Buyer</ShippingCostPaidByOption>
+        </ReturnPolicy>`
+      : "";
 
-  const policiesXml = `${sellerProfilesXml}${inlineShippingXml}${inlineReturnXml}`;
+    return `${sellerProfilesXml}${inlineShippingXml}${inlineReturnXml}`;
+  };
 
   // Best Offer (Allow offers) を全出品で有効化。env=off で無効化可能。
   // buyer が金額提示でき、seller が accept/counter/decline できる。
@@ -227,7 +230,7 @@ export async function addFixedPriceItem(item: {
     ? `<BestOfferDetails><BestOfferEnabled>true</BestOfferEnabled></BestOfferDetails>`
     : "";
 
-  const buildXml = (includeBestOffer: boolean) => `<Item>
+  const buildXml = (opts: { includeBestOffer: boolean; useShipProfile: boolean }) => `<Item>
     <Title>${xmlEscape(item.title.slice(0, 80))}</Title>
     <Description><![CDATA[${item.description}]]></Description>
     <PrimaryCategory><CategoryID>${item.categoryId}</CategoryID></PrimaryCategory>
@@ -244,19 +247,20 @@ export async function addFixedPriceItem(item: {
     <DispatchTimeMax>5</DispatchTimeMax>
     <PictureDetails>${pictureXml}</PictureDetails>
     ${aspectXml ? `<ItemSpecifics>${aspectXml}</ItemSpecifics>` : ""}
-    ${includeBestOffer ? bestOfferXml : ""}
-    ${policiesXml}
+    ${opts.includeBestOffer ? bestOfferXml : ""}
+    ${buildPoliciesXml({ useShipProfile: opts.useShipProfile })}
   </Item>`;
 
-  async function tryAdd(includeBestOffer: boolean) {
-    return await callTradingApi("AddFixedPriceItem", buildXml(includeBestOffer));
+  async function tryAdd(opts: { includeBestOffer: boolean; useShipProfile: boolean }) {
+    return await callTradingApi("AddFixedPriceItem", buildXml(opts));
   }
 
   let res: Record<string, unknown>;
   try {
-    res = await tryAdd(bestOfferEnabled);
+    res = await tryAdd({ includeBestOffer: bestOfferEnabled, useShipProfile: !!shipProfile });
   } catch (err) {
     const codes = (err as Error & { errorCodes?: number[] }).errorCodes ?? [];
+    const message = (err as Error).message ?? "";
 
     // SKU 重複 (21916564) は ReviseFixedPriceItem で既存出品を更新するべきもの
     if (codes.includes(21916564)) {
@@ -265,16 +269,35 @@ export async function addFixedPriceItem(item: {
       );
     }
 
-    // [37] Input data is invalid を BestOffer 付きで食らったら、BestOffer 無しで再試行
-    if (bestOfferEnabled && codes.includes(37)) {
+    // [37] かつ SellerShippingProfile を eBay が拒否してたら、profile を外して
+    // インライン送料で再試行 (カテゴリ制限などで profile が使えないとき)
+    if (
+      codes.includes(37) &&
+      !!shipProfile &&
+      /SellerShippingProfile|ShippingProfileID/i.test(message)
+    ) {
+      console.warn(
+        `[trading] AddFixedPriceItem sku=${item.sku} shipping profile rejected, retrying with inline ShippingDetails`
+      );
+      try {
+        res = await tryAdd({ includeBestOffer: bestOfferEnabled, useShipProfile: false });
+      } catch (err2) {
+        // それでもダメで [37] かつ BestOffer なら BestOffer も外す
+        const codes2 = (err2 as Error & { errorCodes?: number[] }).errorCodes ?? [];
+        if (bestOfferEnabled && codes2.includes(37)) {
+          console.warn(`[trading] AddFixedPriceItem sku=${item.sku} retrying without BestOffer too`);
+          res = await tryAdd({ includeBestOffer: false, useShipProfile: false });
+        } else {
+          throw err2;
+        }
+      }
+    }
+    // [37] かつ BestOffer 付きなら、BestOffer 無しで再試行
+    else if (bestOfferEnabled && codes.includes(37)) {
       console.warn(
         `[trading] AddFixedPriceItem sku=${item.sku} error 37 with BestOffer, retrying without it`
       );
-      try {
-        res = await tryAdd(false);
-      } catch (err2) {
-        throw err2;
-      }
+      res = await tryAdd({ includeBestOffer: false, useShipProfile: !!shipProfile });
     } else {
       throw err;
     }
