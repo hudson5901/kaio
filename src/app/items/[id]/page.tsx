@@ -56,9 +56,12 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
   const [editingDesc, setEditingDesc] = useState(false);
   const [editingPrice, setEditingPrice] = useState(false);
   const [savingPrice, setSavingPrice] = useState(false);
+  const [editingShipping, setEditingShipping] = useState(false);
+  const [savingShipping, setSavingShipping] = useState(false);
   const [draftTitle, setDraftTitle] = useState("");
   const [draftDesc, setDraftDesc] = useState("");
   const [draftPrice, setDraftPrice] = useState("");
+  const [draftShipping, setDraftShipping] = useState("");
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const [scoring, setScoring] = useState(false);
   const [classifying, setClassifying] = useState(false);
@@ -219,6 +222,40 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
       await fetchItem();
     } finally {
       setSavingPrice(false);
+    }
+  }
+
+  // 送料保存: 手動上書きで FedEx テーブルを無視
+  async function saveShipping() {
+    if (savingShipping || !item) return;
+    const val = parseFloat(draftShipping);
+    if (!Number.isFinite(val) || val < 0 || val === item.shippingCostUsd) {
+      setEditingShipping(false);
+      return;
+    }
+    setSavingShipping(true);
+    try {
+      const oldShipping = item.shippingCostUsd;
+      const res = await fetch(`/api/items/${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "set_shipping", shippingCostUsd: val }),
+      });
+      if (!res.ok) {
+        showItemToast("error", "送料の保存に失敗しました");
+        return;
+      }
+      const newCosts = await res.json();
+      setCosts(newCosts);
+      await fetch(`/api/items/${item.id}/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: `送料を $${oldShipping ?? 0} → $${val} に手動変更しました` }),
+      }).catch(() => {});
+      setEditingShipping(false);
+      await fetchItem();
+    } finally {
+      setSavingShipping(false);
     }
   }
 
@@ -804,12 +841,37 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
                           : item.weightG ? `${item.weightG}g` : "2000g"}
                         ）
                       </span>
-                      <span className="tabular-nums text-red-400">
-                        {costs
-                          ? `-¥${costs.shippingCostJpy?.toLocaleString()}`
-                          : item.shippingCostUsd ? `-$${item.shippingCostUsd}` : "-"
-                        }
-                      </span>
+                      {editingShipping ? (
+                        <form onSubmit={(e) => { e.preventDefault(); saveShipping(); }} className="flex items-center gap-0.5">
+                          <span className="text-xs text-red-400">-$</span>
+                          <input
+                            autoFocus
+                            type="number"
+                            step="0.01"
+                            className="w-16 text-xs text-red-400 tabular-nums bg-transparent border-b border-red-400/60 outline-none text-right disabled:opacity-50"
+                            value={draftShipping}
+                            disabled={savingShipping}
+                            onChange={(e) => setDraftShipping(e.target.value)}
+                            onBlur={() => saveShipping()}
+                            onKeyDown={(e) => { if (e.key === "Escape") { e.preventDefault(); setEditingShipping(false); } }}
+                          />
+                        </form>
+                      ) : (
+                        <span
+                          className="tabular-nums text-red-400 cursor-pointer hover:underline"
+                          title="クリックで手動編集 (USD)"
+                          onClick={() => {
+                            const cur = item.shippingCostUsd ?? (costs ? costs.shippingCostJpy / (costs.exchangeRate || 160) : 0);
+                            setDraftShipping(String(cur ? cur.toFixed(2) : ""));
+                            setEditingShipping(true);
+                          }}
+                        >
+                          {costs
+                            ? `-¥${costs.shippingCostJpy?.toLocaleString()}`
+                            : item.shippingCostUsd ? `-$${item.shippingCostUsd}` : "-"
+                          }
+                        </span>
+                      )}
                     </div>
                     <div className="flex justify-between text-xs">
                       <span className="text-muted-foreground">関税 ((販売価格+送料)の10%)</span>

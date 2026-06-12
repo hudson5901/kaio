@@ -146,6 +146,8 @@ export function calculateCosts(params: {
   customsRate?: number;
   salesTaxRate?: number;
   profitMargin?: number;
+  // 手動送料指定 (USD)。設定すると FedEx テーブルではなくこの値を採用。
+  shippingCostUsdOverride?: number | null;
 }): CostBreakdown {
   const {
     mercariPriceJpy,
@@ -187,8 +189,12 @@ export function calculateCosts(params: {
   // FedEx は実重量と容積重量の高い方を課金重量とする
   const chargeableWeight = Math.max(actualWeight, volumetricWeight);
 
-  // --- 送料 (FedEx International Priority) ---
-  const shippingCostJpy = calculateFedexShipping(chargeableWeight);
+  // --- 送料 (FedEx テーブル or 手動上書き) ---
+  const override = params.shippingCostUsdOverride;
+  const shippingCostJpy =
+    override != null && Number.isFinite(override) && override >= 0
+      ? override * exchangeRate
+      : calculateFedexShipping(chargeableWeight);
   const shippingCostUsd = shippingCostJpy / exchangeRate;
 
   // --- eBay販売価格 ---
