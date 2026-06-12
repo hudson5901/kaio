@@ -84,6 +84,7 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setFrom(params.get("from"));
   }, [pathname]);
 
@@ -119,6 +120,8 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
           onClick={onToggle}
           className="w-8 h-8 rounded-md flex items-center justify-center text-muted-foreground hover:bg-accent hover:text-foreground transition-colors flex-shrink-0"
           title={collapsed ? "サイドバーを開く" : "サイドバーを閉じる"}
+          aria-label={collapsed ? "サイドバーを開く" : "サイドバーを閉じる"}
+          aria-expanded={!collapsed}
         >
           {collapsed ? (
             <svg className="w-[16px] h-[16px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -209,8 +212,9 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
                   }}
                   className="p-1 rounded text-muted-foreground/60 hover:text-foreground hover:bg-accent transition-colors flex-shrink-0"
                   title="ログアウト"
+                  aria-label="ログアウト"
                 >
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" />
                   </svg>
                 </button>

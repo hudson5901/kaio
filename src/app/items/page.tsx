@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, useRef, useCallback } from "react";
-import { Badge } from "@/components/ui/badge";
+import { useEffect, useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -45,7 +44,27 @@ export default function ItemsPage() {
   const [exchangeRate, setExchangeRate] = useState<number>(160);
   const [pageSize, setPageSize] = useState<number>(30);
 
+  async function fetchItems() {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/items");
+      if (res.ok) {
+        const data = await res.json();
+        setItems(Array.isArray(data) ? data : []);
+      }
+    } catch { /* ignore */ }
+    finally { setLoading(false); }
+  }
+
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => { fetchItems(); }, []);
+  // タブ復帰時に再取得 (詳細から戻ったときの削除や判定変更を反映)
+  useEffect(() => {
+    function onVisible() { if (!document.hidden) fetchItems(); }
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
     fetch("/api/exchange-rate")
@@ -61,7 +80,10 @@ export default function ItemsPage() {
   }, [search]);
 
   // フィルタ変更時にページリセット
-  useEffect(() => { setPage(1); }, [debouncedSearch, mercariFilter, ebayFilter, decisionFilter, sortKey, pageSize]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPage(1);
+  }, [debouncedSearch, mercariFilter, ebayFilter, decisionFilter, sortKey, pageSize]);
 
   const filtered = useMemo(() => {
     let result = items;
@@ -86,17 +108,23 @@ export default function ItemsPage() {
       else result = result.filter((i) => i.decision === decisionFilter);
     }
 
-    // ソート
+    // ソート (null は方向に関係なく必ず末尾)
+    const cmpNumNullsLast = (av: number | null | undefined, bv: number | null | undefined, dir: "asc" | "desc") => {
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      return dir === "asc" ? av - bv : bv - av;
+    };
     result = [...result].sort((a, b) => {
       switch (sortKey) {
         case "updated": return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
-        case "price_asc": return (a.mercariPrice || 0) - (b.mercariPrice || 0);
-        case "price_desc": return (b.mercariPrice || 0) - (a.mercariPrice || 0);
-        case "profit_desc": return (b.estimatedProfitUsd || -999) - (a.estimatedProfitUsd || -999);
-        case "profit_asc": return (a.estimatedProfitUsd || 999) - (b.estimatedProfitUsd || 999);
-        case "ebay_price": return (b.ebayPriceUsd || 0) - (a.ebayPriceUsd || 0);
-        case "ai_score": return (b.aiScore || -1) - (a.aiScore || -1);
-        case "likes_desc": return (b.mercariLikes || 0) - (a.mercariLikes || 0);
+        case "price_asc": return cmpNumNullsLast(a.mercariPrice, b.mercariPrice, "asc");
+        case "price_desc": return cmpNumNullsLast(a.mercariPrice, b.mercariPrice, "desc");
+        case "profit_desc": return cmpNumNullsLast(a.estimatedProfitUsd, b.estimatedProfitUsd, "desc");
+        case "profit_asc": return cmpNumNullsLast(a.estimatedProfitUsd, b.estimatedProfitUsd, "asc");
+        case "ebay_price": return cmpNumNullsLast(a.ebayPriceUsd, b.ebayPriceUsd, "desc");
+        case "ai_score": return cmpNumNullsLast(a.aiScore, b.aiScore, "desc");
+        case "likes_desc": return cmpNumNullsLast(a.mercariLikes, b.mercariLikes, "desc");
         case "date":
         default: return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       }
@@ -105,8 +133,16 @@ export default function ItemsPage() {
     return result;
   }, [items, debouncedSearch, mercariFilter, ebayFilter, decisionFilter, sortKey]);
 
-  const totalPages = Math.ceil(filtered.length / pageSize);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const paged = filtered.slice((page - 1) * pageSize, page * pageSize);
+
+  // フィルタが絞られて現在ページが範囲外になったら 1 ページ目に戻す
+  useEffect(() => {
+    if (page > totalPages) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setPage(1);
+    }
+  }, [totalPages, page]);
 
   // フィルタ済みIDリストをsessionStorageに保存（詳細ページの前後ナビで使用）
   useEffect(() => {
@@ -114,18 +150,6 @@ export default function ItemsPage() {
       sessionStorage.setItem("kaio-filtered-ids", JSON.stringify(filtered.map(i => i.id)));
     } catch { /* ignore */ }
   }, [filtered]);
-
-  async function fetchItems() {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/items");
-      if (res.ok) {
-        const data = await res.json();
-        setItems(Array.isArray(data) ? data : []);
-      }
-    } catch { /* ignore */ }
-    finally { setLoading(false); }
-  }
 
   function toggleSelect(id: string) {
     setSelected((prev) => {
@@ -580,7 +604,9 @@ export default function ItemsPage() {
                       </span>
                     ) : <span className="text-[13px] text-muted-foreground/30">--</span>}
                   </span>
-                  <span className="hidden sm:block text-[13px] text-right tabular-nums text-muted-foreground">¥{(item.mercariPrice || 0).toLocaleString()}</span>
+                  <span className="hidden sm:block text-[13px] text-right tabular-nums text-muted-foreground">
+                    {item.mercariPrice != null ? `¥${item.mercariPrice.toLocaleString()}` : <span className="text-muted-foreground/30">--</span>}
+                  </span>
                   <span className="hidden sm:block text-[13px] text-right tabular-nums">{item.ebayPriceUsd ? `$${item.ebayPriceUsd}` : <span className="text-muted-foreground/30">--</span>}</span>
                   <span className={`hidden sm:block text-[12px] text-right tabular-nums font-medium ${item.aiScore != null && item.aiScore >= 70 ? "text-emerald-500" : item.aiScore != null && item.aiScore >= 40 ? "text-amber-500" : item.aiScore != null ? "text-red-400" : ""}`}>
                     {item.aiScore != null ? item.aiScore : <span className="text-muted-foreground/30">--</span>}

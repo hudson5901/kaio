@@ -5,15 +5,54 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { Item } from "@/lib/db/schema";
 import { CommentsSection } from "@/components/comments-section";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { checkShouldPass, type PassCheckResult } from "@/lib/kabuto/pass-checker";
 import { STATUS_LABELS as statusLabels, STATUS_COLORS as statusColors } from "@/lib/format";
+import { sanitizeListingHtml } from "@/lib/sanitize-html";
 
 function StatusDot({ status }: { status: string }) {
   return <span className={`inline-block w-2 h-2 rounded-full ${statusColors[status] || "bg-zinc-400"}`} />;
+}
+
+// 寸法・重量入力 (制御コンポーネント): 外部からの val 更新を反映しつつ、編集中はローカル draft を保持
+function DimensionInput({ label, val, onSave }: {
+  label: string;
+  val: number | null | undefined;
+  onSave: (next: number | null) => void | Promise<void>;
+}) {
+  const [draft, setDraft] = useState<string>(val == null ? "" : String(val));
+  const [focused, setFocused] = useState(false);
+  // フォーカスがない時のみ外部の値で同期 (タイプ中の上書きを防ぐ)
+  useEffect(() => {
+    if (!focused) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setDraft(val == null ? "" : String(val));
+    }
+  }, [val, focused]);
+  return (
+    <div>
+      <label className="text-[11px] text-muted-foreground block mb-0.5">{label}</label>
+      <Input
+        type="number"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onFocus={() => setFocused(true)}
+        onBlur={async () => {
+          setFocused(false);
+          const raw = draft.trim();
+          const parsed = raw === "" ? null : parseFloat(raw);
+          const next = Number.isFinite(parsed as number) ? (parsed as number) : null;
+          if (next === (val ?? null)) return;
+          await onSave(next);
+        }}
+        className="h-8 text-sm"
+      />
+    </div>
+  );
 }
 
 function CheckBox({ checked, loading }: { checked: boolean; loading?: boolean }) {
@@ -80,6 +119,7 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
   const navQuery = navQueryFor(viewMode);
 
   // パスチェッカー
+  /* eslint-disable react-hooks/exhaustive-deps, react-hooks/set-state-in-effect */
   const passCheck = useMemo<PassCheckResult | null>(() => {
     if (!item) return null;
     return checkShouldPass(item.mercariTitle, item.mercariDescription, item.mercariPrice);
@@ -116,6 +156,7 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
     if (!item || item.kabutoCategory || classifying) return;
     handleClassify();
   }, [item?.id, item?.mercariDescription]);
+  /* eslint-enable react-hooks/exhaustive-deps, react-hooks/set-state-in-effect */
 
   // キーボードショートカット: 矢印で前後、1/2/3で判定、Esc でモーダル閉じる
   useEffect(() => {
@@ -133,19 +174,20 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
         router.push(`/items/${adjacentItems.prev}${navQuery}`);
       } else if (e.key === "ArrowRight" && adjacentItems.next) {
         router.push(`/items/${adjacentItems.next}${navQuery}`);
-      } else if (e.key === "1") {
-        handleDecision("list");
-      } else if (e.key === "2") {
-        handleDecision("considering");
-      } else if (e.key === "3") {
-        handleDecision("pass");
       } else if (e.key === "?") {
         setShowShortcuts((v) => !v);
+      } else if (viewMode === "judge") {
+        // 1/2/3 で判定変更は判定ビューでのみ有効 (eBay 出品タブでは誤発火を防ぐ)
+        if (e.key === "1") handleDecision("list");
+        else if (e.key === "2") handleDecision("considering");
+        else if (e.key === "3") handleDecision("pass");
       }
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [adjacentItems, router, item, navQuery, lightboxImage, showShortcuts]);
+    // handleDecision はクロージャ参照で十分 (依存に入れると毎回 listener 再登録になる)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adjacentItems, router, item, navQuery, lightboxImage, showShortcuts, viewMode]);
 
   async function fetchAdjacentItems() {
     try {
@@ -492,7 +534,14 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
           <div className="rounded-xl bg-card border border-border overflow-hidden">
             <div className="aspect-[3/2] bg-black flex items-center justify-center relative">
               {allImages[selectedImage] ? (
-                <img src={allImages[selectedImage]} alt="" className="max-w-full max-h-full object-contain cursor-pointer hover:opacity-90 transition-opacity" onClick={() => setLightboxImage(allImages[selectedImage])} />
+                <Image
+                  src={allImages[selectedImage]}
+                  alt=""
+                  fill
+                  sizes="(max-width: 1024px) 100vw, 50vw"
+                  className="object-contain cursor-pointer hover:opacity-90 transition-opacity"
+                  onClick={() => setLightboxImage(allImages[selectedImage])}
+                />
               ) : (
                 <div className="text-muted-foreground">
                   <svg className="w-16 h-16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={0.5}><path strokeLinecap="round" strokeLinejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" /></svg>
@@ -515,9 +564,9 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
                   <button
                     key={i}
                     onClick={() => setSelectedImage(i)}
-                    className={`w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 border-2 transition-all duration-200 ${i === selectedImage ? "border-primary ring-1 ring-primary/30 scale-105" : "border-transparent opacity-50 hover:opacity-90"}`}
+                    className={`relative w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 border-2 transition-all duration-200 ${i === selectedImage ? "border-primary ring-1 ring-primary/30 scale-105" : "border-transparent opacity-50 hover:opacity-90"}`}
                   >
-                    <img src={url} alt="" className="w-full h-full object-cover" loading="lazy" />
+                    <Image src={url} alt="" fill sizes="48px" className="object-cover" loading="lazy" />
                   </button>
                 ))}
               </div>
@@ -541,8 +590,15 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
             {processedImages.length > 0 ? (
               <div className="grid grid-cols-4 gap-1.5 p-2.5">
                 {processedImages.map((path, i) => (
-                  <div key={i} className="relative group">
-                    <img src={path} alt="" onClick={() => setLightboxImage(path)} className="rounded-lg object-cover aspect-square w-full bg-black cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all" />
+                  <div key={i} className="relative group aspect-square w-full bg-black rounded-lg overflow-hidden">
+                    <Image
+                      src={path}
+                      alt=""
+                      fill
+                      sizes="(max-width: 640px) 50vw, 25vw"
+                      onClick={() => setLightboxImage(path)}
+                      className="object-cover cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all"
+                    />
                     <button
                       type="button"
                       onClick={async (e) => {
@@ -836,8 +892,8 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
                       <span className="text-muted-foreground">
                         eLogi送料（
                         {costs?.chargeableWeightG
-                          ? `${costs.chargeableWeightG.toLocaleString()}g${costs.volumetricWeightG > costs.actualWeightG ? " 容積" : ""}`
-                          : item.weightG ? `${item.weightG}g` : "2000g"}
+                          ? `${costs.chargeableWeightG.toLocaleString()}g${(costs.volumetricWeightG ?? 0) > (costs.actualWeightG ?? 0) ? " 容積" : ""}`
+                          : item.weightG ? `${item.weightG}g` : "重量未設定"}
                         ）
                       </span>
                       {editingShipping ? (
@@ -948,28 +1004,20 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
             </div>
             <div className="p-3 grid grid-cols-2 gap-2.5">
               {[
-                { label: "全長 (cm)", key: "lengthCm", val: item.lengthCm },
-                { label: "重量 (g)", key: "weightG", val: item.weightG },
-                { label: "幅 (cm)", key: "widthCm", val: item.widthCm },
-                { label: "高さ (cm)", key: "heightCm", val: item.heightCm },
+                { label: "全長 (cm)", key: "lengthCm" as const, val: item.lengthCm },
+                { label: "重量 (g)", key: "weightG" as const, val: item.weightG },
+                { label: "幅 (cm)", key: "widthCm" as const, val: item.widthCm },
+                { label: "高さ (cm)", key: "heightCm" as const, val: item.heightCm },
               ].map(({ label, key, val }) => (
-                <div key={key}>
-                  <label className="text-[11px] text-muted-foreground block mb-0.5">{label}</label>
-                  <Input
-                    type="number"
-                    defaultValue={val ?? ""}
-                    className="h-8 text-sm"
-                    onBlur={async (e) => {
-                      const raw = e.target.value;
-                      const parsed = raw === "" ? null : parseFloat(raw);
-                      const next = Number.isFinite(parsed as number) ? parsed : null;
-                      if (next === val) return; // 変更無しは送らない
-                      await handleAction("update", { [key]: next });
-                      // 寸法・重量変更で送料/利益が変わるので自動再計算
-                      await handleAction("calculate_costs");
-                    }}
-                  />
-                </div>
+                <DimensionInput
+                  key={key}
+                  label={label}
+                  val={val}
+                  onSave={async (next) => {
+                    await handleAction("update", { [key]: next });
+                    await handleAction("calculate_costs");
+                  }}
+                />
               ))}
             </div>
           </div>
@@ -1093,14 +1141,28 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
 
           {/* Actions - better visual weight */}
           <div className="space-y-2 pt-1">
-            {item.ebayStatus === "draft" && (
-              <Button className="w-full gap-2 h-10 text-sm font-semibold shadow-sm shadow-primary/20" onClick={() => {
-                if (confirm(`eBay に即時公開します。\nタイトル: ${item.ebayTitle?.slice(0, 60)}\n価格: $${item.ebayPriceUsd}\n\n続行しますか？`)) handleAction("list_on_ebay");
-              }} disabled={actionLoading === "list_on_ebay"}>
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3" /></svg>
-                {actionLoading === "list_on_ebay" ? "出品中..." : "eBayに即時出品"}
-              </Button>
-            )}
+            {item.ebayStatus === "draft" && (() => {
+              const missing: string[] = [];
+              if (!item.ebayTitle) missing.push("タイトル");
+              if (!item.ebayDescription) missing.push("説明文");
+              if (item.ebayPriceUsd == null) missing.push("価格");
+              if (item.weightG == null) missing.push("重量");
+              if (item.lengthCm == null || item.widthCm == null || item.heightCm == null) missing.push("寸法");
+              const canList = missing.length === 0 && actionLoading !== "list_on_ebay";
+              return (
+                <Button
+                  className="w-full gap-2 h-10 text-sm font-semibold shadow-sm shadow-primary/20"
+                  onClick={() => {
+                    if (confirm(`eBay に即時公開します。\nタイトル: ${item.ebayTitle?.slice(0, 60) ?? "(未設定)"}\n価格: ${item.ebayPriceUsd != null ? `$${item.ebayPriceUsd}` : "(未設定)"}\n\n続行しますか？`)) handleAction("list_on_ebay");
+                  }}
+                  disabled={!canList}
+                  title={missing.length ? `未入力: ${missing.join(", ")}` : undefined}
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3" /></svg>
+                  {actionLoading === "list_on_ebay" ? "出品中..." : missing.length ? `要入力: ${missing.join("/")}` : "eBayに即時出品"}
+                </Button>
+              );
+            })()}
             {item.ebayStatus === "listed" && (
               <Button className="w-full h-10 text-sm font-semibold" variant="destructive" onClick={() => handleAction("remove_from_ebay")} disabled={actionLoading === "remove_from_ebay"}>
                 {actionLoading === "remove_from_ebay" ? "削除中..." : "eBayから取り下げる"}
@@ -1129,8 +1191,9 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
             { key: "images", ok: processedImages.length > 0, label: `画像加工済み (${processedImages.length}枚)` },
             { key: "title", ok: !!item.ebayTitle, label: "タイトル" },
             { key: "description", ok: !!item.ebayDescription, label: "説明文" },
-            { key: "price", ok: !!item.ebayPriceUsd, label: "価格設定" },
-            { key: "weight", ok: !!item.weightG, label: "重量" },
+            { key: "price", ok: item.ebayPriceUsd != null, label: "価格設定" },
+            { key: "weight", ok: item.weightG != null, label: "重量" },
+            { key: "dimensions", ok: item.lengthCm != null && item.widthCm != null && item.heightCm != null, label: "寸法(L/W/H)" },
           ] as const;
           let staffChecks: Record<string, Record<string, string>> = {};
           try { staffChecks = item.staffChecks ? JSON.parse(item.staffChecks) : {}; } catch { /* ignore */ }
@@ -1285,14 +1348,28 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
               <Button size="sm" variant="outline" className="text-xs h-8" onClick={() => handleAction("calculate_costs")} disabled={actionLoading === "calculate_costs"}>
                 {actionLoading === "calculate_costs" ? "計算中..." : "再計算"}
               </Button>
-              {item.ebayStatus === "draft" && (
-                <Button className="gap-2 h-10 text-sm font-semibold shadow-sm shadow-primary/20 px-6" onClick={() => {
-                  if (confirm(`eBay に即時公開します。\nタイトル: ${item.ebayTitle?.slice(0, 60)}\n価格: $${item.ebayPriceUsd}\n\n続行しますか？`)) handleAction("list_on_ebay");
-                }} disabled={actionLoading === "list_on_ebay"}>
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3" /></svg>
-                  {actionLoading === "list_on_ebay" ? "出品中..." : "eBayに即時出品"}
-                </Button>
-              )}
+              {item.ebayStatus === "draft" && (() => {
+                const missing: string[] = [];
+                if (!item.ebayTitle) missing.push("タイトル");
+                if (!item.ebayDescription) missing.push("説明文");
+                if (item.ebayPriceUsd == null) missing.push("価格");
+                if (item.weightG == null) missing.push("重量");
+                if (item.lengthCm == null || item.widthCm == null || item.heightCm == null) missing.push("寸法");
+                const canList = missing.length === 0 && actionLoading !== "list_on_ebay";
+                return (
+                  <Button
+                    className="gap-2 h-10 text-sm font-semibold shadow-sm shadow-primary/20 px-6"
+                    onClick={() => {
+                      if (confirm(`eBay に即時公開します。\nタイトル: ${item.ebayTitle?.slice(0, 60) ?? "(未設定)"}\n価格: ${item.ebayPriceUsd != null ? `$${item.ebayPriceUsd}` : "(未設定)"}\n\n続行しますか？`)) handleAction("list_on_ebay");
+                    }}
+                    disabled={!canList}
+                    title={missing.length ? `未入力: ${missing.join(", ")}` : undefined}
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3" /></svg>
+                    {actionLoading === "list_on_ebay" ? "出品中..." : missing.length ? `要入力: ${missing.join("/")}` : "eBayに即時出品"}
+                  </Button>
+                );
+              })()}
               {item.ebayStatus === "listed" && (
                 <Button className="h-10 text-sm font-semibold" variant="destructive" onClick={() => handleAction("remove_from_ebay")} disabled={actionLoading === "remove_from_ebay"}>
                   {actionLoading === "remove_from_ebay" ? "削除中..." : "eBayから取り下げる"}
@@ -1320,6 +1397,7 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
           draftDesc={draftDesc}
           setDraftDesc={setDraftDesc}
           onSave={saveListingText}
+          exchangeRate={costs?.exchangeRate ?? 160}
         />
       </div>
       )}
@@ -1336,12 +1414,15 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
           >
             &times;
           </button>
-          <img
-            src={lightboxImage}
-            alt=""
-            className="max-w-[90vw] max-h-[90vh] object-contain"
-            onClick={(e) => e.stopPropagation()}
-          />
+          <div className="relative w-[90vw] h-[90vh]" onClick={(e) => e.stopPropagation()}>
+            <Image
+              src={lightboxImage}
+              alt=""
+              fill
+              sizes="90vw"
+              className="object-contain"
+            />
+          </div>
         </div>
       )}
 
@@ -1406,6 +1487,7 @@ function EbayPreview({
   generating, onGenerate,
   editingTitle, setEditingTitle, editingDesc, setEditingDesc,
   draftTitle, setDraftTitle, draftDesc, setDraftDesc, onSave,
+  exchangeRate = 160,
 }: {
   item: Item;
   mercariImages: string[];
@@ -1423,6 +1505,7 @@ function EbayPreview({
   draftDesc: string;
   setDraftDesc: (s: string) => void;
   onSave: (field: "ebayTitle" | "ebayDescription", value: string) => void;
+  exchangeRate?: number;
 }) {
   const listingImages = processedImages.length > 0 ? processedImages : mercariImages;
   const hasListing = item.ebayTitle || item.ebayDescription;
@@ -1492,11 +1575,11 @@ function EbayPreview({
             <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr] gap-0">
               {/* Left: Images */}
               <div className="p-4 border-b md:border-b-0 md:border-r border-gray-200">
-                <div className="aspect-square bg-gray-50 rounded flex items-center justify-center mb-3 overflow-hidden">
+                <div className="relative aspect-square bg-gray-50 rounded mb-3 overflow-hidden">
                   {listingImages[previewImage] ? (
-                    <img src={listingImages[previewImage]} alt="" className="max-w-full max-h-full object-contain" />
+                    <Image src={listingImages[previewImage]} alt="" fill sizes="(max-width: 768px) 100vw, 50vw" className="object-contain" />
                   ) : (
-                    <div className="text-gray-300">No Image</div>
+                    <div className="absolute inset-0 flex items-center justify-center text-gray-300">No Image</div>
                   )}
                 </div>
                 {listingImages.length > 1 && (
@@ -1505,9 +1588,9 @@ function EbayPreview({
                       <button
                         key={i}
                         onClick={() => setPreviewImage(i)}
-                        className={`w-12 h-12 rounded flex-shrink-0 overflow-hidden border-2 transition-all ${i === previewImage ? "border-blue-500" : "border-gray-200 hover:border-gray-400"}`}
+                        className={`relative w-12 h-12 rounded flex-shrink-0 overflow-hidden border-2 transition-all ${i === previewImage ? "border-blue-500" : "border-gray-200 hover:border-gray-400"}`}
                       >
-                        <img src={url} alt="" className="w-full h-full object-cover" />
+                        <Image src={url} alt="" fill sizes="48px" className="object-cover" />
                       </button>
                     ))}
                   </div>
@@ -1559,10 +1642,18 @@ function EbayPreview({
 
                 {/* Price */}
                 <div className="flex items-baseline gap-2">
-                  <span className="text-2xl font-bold text-gray-900">
-                    US ${item.ebayPriceUsd?.toFixed(2) || "0.00"}
-                  </span>
-                  <span className="text-xs text-gray-500">approx. ¥{(item.mercariPrice || 0).toLocaleString()}</span>
+                  {item.ebayPriceUsd != null ? (
+                    <>
+                      <span className="text-2xl font-bold text-gray-900">
+                        US ${item.ebayPriceUsd.toFixed(2)}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        approx. ¥{Math.round(item.ebayPriceUsd * exchangeRate).toLocaleString()}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-base text-gray-400 italic">価格未設定</span>
+                  )}
                 </div>
 
                 {/* Condition */}
@@ -1589,63 +1680,51 @@ function EbayPreview({
                   )}
                 </div>
 
-                {/* Item specifics */}
-                <div className="border-t border-gray-200 pt-3">
-                  <h4 className="text-sm font-semibold mb-2 text-gray-700">Item specifics</h4>
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
-                    {(() => {
-                      let aspects: Record<string, string[]> = {};
-                      try { if (item.ebayAspects) aspects = JSON.parse(item.ebayAspects); } catch { /* */ }
-                      const hasAspects = Object.keys(aspects).length > 0;
-
-                      if (hasAspects) {
-                        return Object.entries(aspects).map(([key, values]) => (
+                {/* Item specifics — 表示するものがある時だけ描画 */}
+                {(() => {
+                  let aspects: Record<string, string[]> = {};
+                  try { if (item.ebayAspects) aspects = JSON.parse(item.ebayAspects); } catch { /* */ }
+                  const hasAspects = Object.keys(aspects).length > 0;
+                  const hasAnyDim = item.lengthCm != null || item.weightG != null || item.widthCm != null || item.heightCm != null;
+                  if (!hasAspects && !hasAnyDim) return null;
+                  return (
+                    <div className="border-t border-gray-200 pt-3">
+                      <h4 className="text-sm font-semibold mb-2 text-gray-700">Item specifics</h4>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+                        {hasAspects && Object.entries(aspects).map(([key, values]) => (
                           <div key={key} className="flex">
                             <span className="text-gray-500 w-24 flex-shrink-0 text-xs">{key}</span>
                             <span className="font-medium text-xs">{(values as string[]).join(", ")}</span>
                           </div>
-                        ));
-                      }
-                      // フォールバック: 自動検出
-                      return (
-                        <>
+                        ))}
+                        {item.lengthCm != null && (
                           <div className="flex">
-                            <span className="text-gray-500 w-20 flex-shrink-0">Type</span>
-                            <span className="font-medium">{detectItemType(item.mercariTitle, item.mercariDescription || "")}</span>
+                            <span className="text-gray-500 w-24 flex-shrink-0 text-xs">Length</span>
+                            <span className="text-xs">{item.lengthCm} cm / {(item.lengthCm / 2.54).toFixed(1)}&quot;</span>
                           </div>
+                        )}
+                        {item.weightG != null && (
                           <div className="flex">
-                            <span className="text-gray-500 w-20 flex-shrink-0">Origin</span>
-                            <span className="font-medium">Japan</span>
+                            <span className="text-gray-500 w-24 flex-shrink-0 text-xs">Weight</span>
+                            <span className="text-xs">{item.weightG}g / {(item.weightG / 453.592).toFixed(2)} lbs</span>
                           </div>
-                        </>
-                      );
-                    })()}
-                    {item.lengthCm && (
-                      <div className="flex">
-                        <span className="text-gray-500 w-24 flex-shrink-0 text-xs">Length</span>
-                        <span className="text-xs">{item.lengthCm} cm / {(item.lengthCm / 2.54).toFixed(1)}&quot;</span>
+                        )}
+                        {item.widthCm != null && (
+                          <div className="flex">
+                            <span className="text-gray-500 w-24 flex-shrink-0 text-xs">Width</span>
+                            <span className="text-xs">{item.widthCm} cm</span>
+                          </div>
+                        )}
+                        {item.heightCm != null && (
+                          <div className="flex">
+                            <span className="text-gray-500 w-24 flex-shrink-0 text-xs">Height</span>
+                            <span className="text-xs">{item.heightCm} cm</span>
+                          </div>
+                        )}
                       </div>
-                    )}
-                    {item.weightG && (
-                      <div className="flex">
-                        <span className="text-gray-500 w-24 flex-shrink-0 text-xs">Weight</span>
-                        <span className="text-xs">{item.weightG}g / {(item.weightG / 453.592).toFixed(2)} lbs</span>
-                      </div>
-                    )}
-                    {item.widthCm && (
-                      <div className="flex">
-                        <span className="text-gray-500 w-24 flex-shrink-0 text-xs">Width</span>
-                        <span className="text-xs">{item.widthCm} cm</span>
-                      </div>
-                    )}
-                    {item.heightCm && (
-                      <div className="flex">
-                        <span className="text-gray-500 w-24 flex-shrink-0 text-xs">Height</span>
-                        <span className="text-xs">{item.heightCm} cm</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Buy it now button (decorative) */}
                 <div className="pt-2 space-y-2">
@@ -1701,7 +1780,7 @@ function EbayPreview({
               ) : item.ebayDescription ? (
                 <div
                   className="text-sm text-gray-700 leading-relaxed prose prose-sm max-w-none"
-                  dangerouslySetInnerHTML={{ __html: item.ebayDescription }}
+                  dangerouslySetInnerHTML={{ __html: sanitizeListingHtml(item.ebayDescription) }}
                 />
               ) : (
                 <p className="text-sm text-gray-400 italic">No description generated yet</p>
@@ -1769,7 +1848,7 @@ function JapaneseTranslationPanel({ item }: { item: Item }) {
               <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Item description</div>
               <div
                 className="text-sm text-gray-700 leading-relaxed prose prose-sm max-w-none"
-                dangerouslySetInnerHTML={{ __html: item.ebayDescriptionJa }}
+                dangerouslySetInnerHTML={{ __html: sanitizeListingHtml(item.ebayDescriptionJa) }}
               />
             </div>
           )}
@@ -1779,19 +1858,3 @@ function JapaneseTranslationPanel({ item }: { item: Item }) {
   );
 }
 
-function detectItemType(title: string, description: string): string {
-  const text = title + description;
-  if (/兜/.test(text)) return "Kabuto (Helmet)";
-  if (/甲冑|鎧/.test(text)) return "Yoroi (Armor)";
-  if (/面頬/.test(text)) return "Menpo (Face Guard)";
-  if (/鍔/.test(text)) return "Tsuba (Sword Guard)";
-  if (/目貫/.test(text)) return "Menuki (Fitting)";
-  if (/短刀/.test(text)) return "Tanto";
-  if (/脇差/.test(text)) return "Wakizashi";
-  if (/太刀/.test(text)) return "Tachi";
-  if (/軍刀/.test(text)) return "Gunto (Military)";
-  if (/居合/.test(text)) return "Iaito (Practice)";
-  if (/模造刀/.test(text)) return "Replica";
-  if (/日本刀|刀/.test(text)) return "Katana";
-  return "Japanese Antique";
-}

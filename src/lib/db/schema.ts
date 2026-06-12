@@ -1,4 +1,4 @@
-import { pgTable, text, integer, real, boolean, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, real, boolean } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
 // ユーザーテーブル

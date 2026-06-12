@@ -108,7 +108,7 @@ export default function ScrapePage() {
     }, 2000);
   }
 
-  // Poll server state
+  // Poll server state (初回ロードのみ。fetchState はクロージャ参照)
   useEffect(() => {
     fetchState();
     return () => {
@@ -117,6 +117,8 @@ export default function ScrapePage() {
         pollRef.current = null;
       }
     };
+    // 初回のみ実行
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function fetchState() {

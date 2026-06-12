@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { db, schema } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { classifyItem } from "@/lib/kabuto/classifier";
-import { getCategory, type KabutoCategory } from "@/lib/kabuto/categories";
+import { getCategory } from "@/lib/kabuto/categories";
 
 export async function POST(
   request: Request,
@@ -27,29 +27,15 @@ export async function POST(
 
     const category = getCategory(result.category);
 
-    // DB更新: カテゴリ + デフォルト値適用
-    const updates: Record<string, unknown> = {
+    // カテゴリと判定信頼度だけを保存する。寸法・重量・eBay aspects は
+    // カテゴリ由来のデフォルト値を DB に書き込まない（実測 or 手入力のみ反映）。
+    // 出品時に aspects が null なら mapping.ts が category.defaultAspects に
+    // フォールバックする。
+    await db.update(schema.items).set({
       kabutoCategory: result.category,
       kabutoCategoryConfidence: result.confidence,
-      ebayAspects: JSON.stringify(category.defaultAspects),
       updatedAt: new Date().toISOString(),
-    };
-
-    // 重量・サイズが未設定ならカテゴリデフォルトを適用
-    if (!item.weightG) {
-      updates.weightG = category.defaultWeightG;
-    }
-    if (!item.lengthCm) {
-      updates.lengthCm = category.defaultDimensions.lengthCm;
-    }
-    if (!item.widthCm) {
-      updates.widthCm = category.defaultDimensions.widthCm;
-    }
-    if (!item.heightCm) {
-      updates.heightCm = category.defaultDimensions.heightCm;
-    }
-
-    await db.update(schema.items).set(updates).where(eq(schema.items.id, id));
+    }).where(eq(schema.items.id, id));
 
     return NextResponse.json({
       success: true,
@@ -58,10 +44,6 @@ export async function POST(
       confidence: result.confidence,
       reason: result.reason,
       method: result.method,
-      defaultsApplied: {
-        weightG: !item.weightG ? category.defaultWeightG : null,
-        dimensions: !item.lengthCm ? category.defaultDimensions : null,
-      },
     });
   } catch (error) {
     console.error("Classification error:", error);

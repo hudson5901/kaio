@@ -23,6 +23,9 @@ const typeLabels: Record<string, { label: string; color: string; icon: string }>
   error: { label: "エラー", color: "text-red-500 bg-red-500/10", icon: "M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" },
 };
 
+// 未知タイプ用 (red の "エラー" 扱いだと誤認するので灰色の汎用アイコン)
+const UNKNOWN_META = { label: "通知", color: "text-zinc-500 bg-zinc-500/10", icon: "M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" };
+
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
@@ -128,7 +131,9 @@ export default function NotificationsPage() {
 
       {/* List */}
       {loading ? (
-        <div className="py-20" />
+        <div className="flex items-center justify-center py-20">
+          <p className="text-[13px] text-muted-foreground">読み込み中...</p>
+        </div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-20">
           <p className="text-[13px] text-muted-foreground">通知はありません</p>
@@ -136,7 +141,7 @@ export default function NotificationsPage() {
       ) : (
         <div className="space-y-1">
           {filtered.map((n) => {
-            const meta = typeLabels[n.type] || typeLabels.error;
+            const meta = typeLabels[n.type] || UNKNOWN_META;
             return (
               <div
                 key={n.id}

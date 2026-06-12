@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 interface User {
   id: string;
@@ -17,6 +18,7 @@ interface User {
 export default function AdminUsersPage() {
   const router = useRouter();
   const [users, setUsers] = useState<User[]>([]);
+  const [authChecked, setAuthChecked] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -33,24 +35,9 @@ export default function AdminUsersPage() {
     password: "",
   });
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    checkAuth();
-  }, []);
-
-  async function checkAuth() {
-    try {
-      const res = await fetch("/api/auth/me");
-      const me = await res.json();
-      if (me.error || me.role !== "admin") {
-        router.push("/");
-        return;
-      }
-      fetchUsers();
-    } catch {
-      router.push("/");
-    }
-  }
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [saving, setSaving] = useState<string | null>(null);
+  const [confirmDel, setConfirmDel] = useState<{ id: string; name: string } | null>(null);
 
   async function fetchUsers() {
     try {
@@ -67,6 +54,27 @@ export default function AdminUsersPage() {
       setLoading(false);
     }
   }
+
+  async function checkAuth() {
+    try {
+      const res = await fetch("/api/auth/me");
+      const me = await res.json();
+      if (me.error || me.role !== "admin") {
+        router.push("/");
+        return;
+      }
+      setAuthChecked(true);
+      fetchUsers();
+    } catch {
+      router.push("/");
+    }
+  }
+
+  /* eslint-disable react-hooks/exhaustive-deps, react-hooks/set-state-in-effect */
+  useEffect(() => {
+    checkAuth();
+  }, []);
+  /* eslint-enable react-hooks/exhaustive-deps, react-hooks/set-state-in-effect */
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -92,6 +100,7 @@ export default function AdminUsersPage() {
 
   async function handleUpdate(id: string) {
     setError("");
+    setSaving(id);
     try {
       const body: Record<string, string> = {};
       if (editData.name) body.name = editData.name;
@@ -113,12 +122,14 @@ export default function AdminUsersPage() {
       fetchUsers();
     } catch {
       setError("ユーザーの更新に失敗しました");
+    } finally {
+      setSaving(null);
     }
   }
 
-  async function handleDelete(id: string, name: string) {
-    if (!confirm(`「${name}」を削除してよろしいですか？`)) return;
+  async function handleDelete(id: string) {
     setError("");
+    setDeleting(id);
     try {
       const res = await fetch(`/api/users/${id}`, {
         method: "DELETE",
@@ -131,6 +142,8 @@ export default function AdminUsersPage() {
       fetchUsers();
     } catch {
       setError("ユーザーの削除に失敗しました");
+    } finally {
+      setDeleting(null);
     }
   }
 
@@ -146,6 +159,11 @@ export default function AdminUsersPage() {
       month: "2-digit",
       day: "2-digit",
     });
+  }
+
+  // 認証確認が終わるまで何も描画しない（非admin にチラ見えさせない）
+  if (!authChecked) {
+    return null;
   }
 
   if (loading) {
@@ -254,11 +272,11 @@ export default function AdminUsersPage() {
         <table className="w-full">
           <thead>
             <tr className="border-b border-border text-xs text-muted-foreground uppercase tracking-wider">
-              <th className="text-left px-4 py-2.5 font-medium">名前</th>
-              <th className="text-left px-4 py-2.5 font-medium">メール</th>
-              <th className="text-left px-4 py-2.5 font-medium">ロール</th>
-              <th className="text-left px-4 py-2.5 font-medium">作成日</th>
-              <th className="text-right px-4 py-2.5 font-medium">操作</th>
+              <th scope="col" className="text-left px-4 py-2.5 font-medium">名前</th>
+              <th scope="col" className="text-left px-4 py-2.5 font-medium">メール</th>
+              <th scope="col" className="text-left px-4 py-2.5 font-medium">ロール</th>
+              <th scope="col" className="text-left px-4 py-2.5 font-medium">作成日</th>
+              <th scope="col" className="text-right px-4 py-2.5 font-medium">操作</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -310,14 +328,18 @@ export default function AdminUsersPage() {
                           variant="outline"
                           className="h-7 text-xs"
                           onClick={() => handleUpdate(user.id)}
+                          disabled={saving === user.id}
+                          aria-label={`${user.name} を保存`}
                         >
-                          保存
+                          {saving === user.id ? "保存中..." : "保存"}
                         </Button>
                         <Button
                           size="sm"
                           variant="ghost"
                           className="h-7 text-xs"
                           onClick={() => setEditingId(null)}
+                          disabled={saving === user.id}
+                          aria-label={`${user.name} の編集を取消`}
                         >
                           取消
                         </Button>
@@ -353,6 +375,7 @@ export default function AdminUsersPage() {
                           variant="ghost"
                           className="h-7 text-xs"
                           onClick={() => startEdit(user)}
+                          aria-label={`${user.name} を編集`}
                         >
                           編集
                         </Button>
@@ -360,9 +383,11 @@ export default function AdminUsersPage() {
                           size="sm"
                           variant="ghost"
                           className="h-7 text-xs text-red-400 hover:text-red-300"
-                          onClick={() => handleDelete(user.id, user.name)}
+                          onClick={() => setConfirmDel({ id: user.id, name: user.name })}
+                          disabled={deleting === user.id}
+                          aria-label={`${user.name} を削除`}
                         >
-                          削除
+                          {deleting === user.id ? "削除中..." : "削除"}
                         </Button>
                       </div>
                     </td>
@@ -373,6 +398,17 @@ export default function AdminUsersPage() {
           </tbody>
         </table>
       </div>
+
+      <ConfirmDialog
+        open={!!confirmDel}
+        onOpenChange={(o) => { if (!o) setConfirmDel(null); }}
+        title="ユーザーを削除"
+        description={confirmDel ? `「${confirmDel.name}」を削除します。この操作は取り消せません。` : ""}
+        confirmLabel="削除"
+        variant="destructive"
+        loading={deleting === confirmDel?.id}
+        onConfirm={() => { if (confirmDel) handleDelete(confirmDel.id); }}
+      />
     </div>
   );
 }

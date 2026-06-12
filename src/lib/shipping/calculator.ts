@@ -231,6 +231,8 @@ export function calculateCosts(params: {
   const actualWeight = weightG || categoryDefaultWeight;
 
   // 容積重量: 梱包オーバーヘッド(+7cm/辺)を加算してから計算
+  // 3辺すべて揃っているときだけ計算する。1辺でも不明なら 0 (実重量で課金)。
+  // 「わからない値を 20cm で勝手に埋める」ことはしない。
   let volumetricWeight = 0;
   if (lengthCm && widthCm && heightCm) {
     volumetricWeight = calculateVolumetricWeight(
@@ -238,11 +240,6 @@ export function calculateCosts(params: {
       widthCm + PACKAGING_OVERHEAD_CM,
       heightCm + PACKAGING_OVERHEAD_CM
     );
-  } else if (lengthCm || widthCm || heightCm) {
-    const l = (lengthCm || 20) + PACKAGING_OVERHEAD_CM;
-    const w = (widthCm || 20) + PACKAGING_OVERHEAD_CM;
-    const h = (heightCm || 20) + PACKAGING_OVERHEAD_CM;
-    volumetricWeight = calculateVolumetricWeight(l, w, h);
   }
 
   // FedEx は実重量と容積重量の高い方を課金重量とする

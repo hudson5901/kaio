@@ -1,7 +1,6 @@
 import { db, schema } from "@/lib/db";
 import { v4 as uuid } from "uuid";
 import { parseDimensions } from "./parser";
-import { eq } from "drizzle-orm";
 import { getExchangeRate } from "@/lib/exchange-rate";
 import { calculateCosts } from "@/lib/shipping/calculator";
 
@@ -376,7 +375,9 @@ export async function fetchItemDetails(mercariId: string, usdToJpy: number = FAL
 /**
  * メルカリ内部APIで検索結果を取得
  * 1リクエストで最大120件取得可能（Jina経由の20件から大幅改善）
+ * 現在は内部API経路を使っていないが、フォールバックとして残してある。
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function fetchSearchPages(
   keyword: string,
   maxItems: number,
@@ -567,7 +568,7 @@ export async function scrapeMercari(
 
   while (totalFetched < maxItems) {
     pageNum++;
-    let pageItems: MercariItem[] = [];
+    const pageItems: MercariItem[] = [];
 
     if (useApi) {
       try {

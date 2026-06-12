@@ -8,6 +8,7 @@ export default function LoginPage() {
   const [error, setError] = useState("");
 
   // URL パラメータからエラーを検出
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("error") === "unauthorized") {
@@ -16,6 +17,7 @@ export default function LoginPage() {
       setError("認証に失敗しました");
     }
   }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   async function handleGoogleLogin() {
     setLoading(true);

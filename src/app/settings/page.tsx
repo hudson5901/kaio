@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
@@ -16,62 +17,127 @@ interface AppSettings {
   autoSyncIntervalMinutes: number;
 }
 
-interface ApiStatus {
-  ebay: boolean;
-  removeBg: boolean;
-  anthropic: boolean;
-}
+// 入力フィールドのバリデーション仕様
+type NumericKey = Exclude<keyof AppSettings, "autoSyncEnabled">;
+const FIELD_SPEC: Record<NumericKey, { min: number; max: number; integer?: boolean; label: string }> = {
+  profitMarginPercent: { min: 0, max: 100, label: "利益マージン" },
+  ebayFeePercent: { min: 0, max: 100, label: "eBay手数料率" },
+  adPercent: { min: 0, max: 100, label: "広告費率" },
+  customsDutyPercent: { min: 0, max: 100, label: "関税率" },
+  salesTaxPercent: { min: 0, max: 100, label: "売上税率" },
+  shippingDiscountPercent: { min: 0, max: 95, label: "送料割引率" },
+  defaultWeightG: { min: 1, max: 100000, integer: true, label: "デフォルト重量" },
+  autoSyncIntervalMinutes: { min: 10, max: 1440, integer: true, label: "自動同期間隔" },
+};
 
 export default function SettingsPage() {
+  const router = useRouter();
+  const [authChecked, setAuthChecked] = useState(false);
   const [settings, setSettings] = useState<AppSettings | null>(null);
+  // 入力中の生の文字列を保持 (空文字 / NaN を正しく扱うため)
+  const [drafts, setDrafts] = useState<Record<NumericKey, string>>({} as Record<NumericKey, string>);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [rateInfo, setRateInfo] = useState<{ rate: number; source: string; updatedAt: string | null } | null>(null);
-  const [apiStatus, setApiStatus] = useState<ApiStatus>({ ebay: false, removeBg: false, anthropic: false });
+  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
+    // 認証確認 (admin/users と同じパターン)
+    fetch("/api/auth/me")
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((me) => {
+        if (me?.error || !me?.id) { router.push("/login"); return; }
+        setAuthChecked(true);
+      })
+      .catch(() => router.push("/login"));
+  }, [router]);
+
+  useEffect(() => {
+    if (!authChecked) return;
     fetch("/api/settings")
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => { if (d && typeof d === "object" && "profitMarginPercent" in d) setSettings(d); })
+      .then((d) => {
+        if (d && typeof d === "object" && "profitMarginPercent" in d) {
+          setSettings(d);
+          const next: Partial<Record<NumericKey, string>> = {};
+          for (const k of Object.keys(FIELD_SPEC) as NumericKey[]) {
+            next[k] = String((d as AppSettings)[k] ?? "");
+          }
+          setDrafts(next as Record<NumericKey, string>);
+        }
+      })
       .catch(() => {});
     fetch("/api/exchange-rate")
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => { if (d?.rate) setRateInfo(d); })
       .catch(() => {});
+  }, [authChecked]);
 
-    // Check API key status from env (client-side check via build-time vars won't work, use server)
-    setApiStatus({
-      ebay: !!(process.env.NEXT_PUBLIC_EBAY_CLIENT_ID),
-      removeBg: false, // Can't check server env from client
-      anthropic: false,
-    });
-  }, []);
+  useEffect(() => () => { if (savedTimerRef.current) clearTimeout(savedTimerRef.current); }, []);
+
+  // ドラフト文字列をパースして検証エラーを返す
+  function getFieldError(key: NumericKey, raw: string): string | null {
+    const spec = FIELD_SPEC[key];
+    const trimmed = raw.trim();
+    if (trimmed === "") return "入力してください";
+    const n = Number(trimmed);
+    if (!Number.isFinite(n)) return "数値として無効です";
+    if (spec.integer && !Number.isInteger(n)) return "整数を入力してください";
+    if (n < spec.min) return `${spec.min}以上で入力してください`;
+    if (n > spec.max) return `${spec.max}以下で入力してください`;
+    return null;
+  }
+
+  const fieldErrors: Partial<Record<NumericKey, string>> = {};
+  for (const k of Object.keys(FIELD_SPEC) as NumericKey[]) {
+    const e = getFieldError(k, drafts[k] ?? "");
+    if (e) fieldErrors[k] = e;
+  }
+  const hasErrors = Object.keys(fieldErrors).length > 0;
+
+  function updateDraft(key: NumericKey, raw: string) {
+    setDrafts((prev) => ({ ...prev, [key]: raw }));
+    setSaved(false);
+    setSaveError(null);
+  }
 
   async function handleSave() {
-    if (!settings) return;
+    if (!settings || hasErrors) return;
     setSaving(true);
+    setSaveError(null);
+    setSaved(false);
     try {
+      // 全フィールドが検証済みなので、ここで数値化
+      const next: AppSettings = { ...settings };
+      for (const k of Object.keys(FIELD_SPEC) as NumericKey[]) {
+        (next as Record<NumericKey, number>)[k] = Number(drafts[k]);
+      }
       const res = await fetch("/api/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(settings),
+        body: JSON.stringify(next),
       });
-      if (res.ok) {
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        setSaveError(`保存に失敗しました (HTTP ${res.status}${txt ? `: ${txt.slice(0, 200)}` : ""})`);
+      } else {
+        setSettings(next);
         setSaved(true);
-        setTimeout(() => setSaved(false), 2000);
+        if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+        savedTimerRef.current = setTimeout(() => setSaved(false), 3000);
       }
-    } catch { /* ignore */ }
-    finally { setSaving(false); }
+    } catch (e) {
+      setSaveError(`保存に失敗しました: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setSaving(false);
+    }
   }
 
-  function updateSetting<K extends keyof AppSettings>(key: K, value: AppSettings[K]) {
-    setSettings((prev) => prev ? { ...prev, [key]: value } : null);
-  }
-
-  if (!settings) {
+  if (!authChecked || !settings) {
     return (
       <div className="flex items-center justify-center py-20">
-        <svg className="w-6 h-6 text-primary animate-spin-slow" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <svg className="w-6 h-6 text-primary animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" />
         </svg>
       </div>
@@ -115,95 +181,53 @@ export default function SettingsPage() {
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider block mb-1">利益マージン (%)</label>
-              <Input
-                type="number"
-                value={settings.profitMarginPercent}
-                onChange={(e) => updateSetting("profitMarginPercent", parseFloat(e.target.value) || 0)}
-                className="h-9"
-              />
-            </div>
-            <div>
-              <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider block mb-1">eBay手数料率 (%)</label>
-              <Input
-                type="number"
-                value={settings.ebayFeePercent}
-                onChange={(e) => updateSetting("ebayFeePercent", parseFloat(e.target.value) || 0)}
-                className="h-9"
-              />
-            </div>
-            <div>
-              <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider block mb-1">広告費率 (%)</label>
-              <Input
-                type="number"
-                value={settings.adPercent}
-                onChange={(e) => updateSetting("adPercent", parseFloat(e.target.value) || 0)}
-                className="h-9"
-                step="0.1"
-              />
-            </div>
-            <div>
-              <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider block mb-1">関税率 (%)</label>
-              <Input
-                type="number"
-                value={settings.customsDutyPercent}
-                onChange={(e) => updateSetting("customsDutyPercent", parseFloat(e.target.value) || 0)}
-                className="h-9"
-              />
-            </div>
-            <div>
-              <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider block mb-1">売上税率 (%)</label>
-              <Input
-                type="number"
-                value={settings.salesTaxPercent}
-                onChange={(e) => updateSetting("salesTaxPercent", parseFloat(e.target.value) || 0)}
-                className="h-9"
-                step="0.1"
-              />
-            </div>
-            <div>
-              <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider block mb-1">送料割引率 (%, eLogi等)</label>
-              <Input
-                type="number"
-                value={settings.shippingDiscountPercent ?? 50}
-                onChange={(e) => updateSetting("shippingDiscountPercent", Math.min(Math.max(parseFloat(e.target.value) || 0, 0), 95))}
-                className="h-9"
-                step="1"
-                min={0}
-                max={95}
-              />
-              <p className="text-[10px] text-muted-foreground/70 mt-1">FedEx List Rate に対する割引率。50 = 半額。</p>
-            </div>
-            <div>
-              <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider block mb-1">デフォルト重量 (g)</label>
-              <Input
-                type="number"
-                value={settings.defaultWeightG}
-                onChange={(e) => updateSetting("defaultWeightG", parseInt(e.target.value) || 2000)}
-                className="h-9"
-              />
-            </div>
-            <div>
-              <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider block mb-1">自動同期間隔 (分)</label>
-              <Input
-                type="number"
-                value={settings.autoSyncIntervalMinutes}
-                onChange={(e) => updateSetting("autoSyncIntervalMinutes", parseInt(e.target.value) || 60)}
-                className="h-9"
-                min={10}
-              />
-            </div>
+            {([
+              { key: "profitMarginPercent", label: "利益マージン (%)", step: "0.1" },
+              { key: "ebayFeePercent", label: "eBay手数料率 (%)", step: "0.1" },
+              { key: "adPercent", label: "広告費率 (%)", step: "0.1" },
+              { key: "customsDutyPercent", label: "関税率 (%)", step: "0.1" },
+              { key: "salesTaxPercent", label: "売上税率 (%)", step: "0.1" },
+              { key: "shippingDiscountPercent", label: "送料割引率 (%, eLogi等)", step: "1", hint: "FedEx List Rate に対する割引率。50 = 半額。" },
+              { key: "defaultWeightG", label: "デフォルト重量 (g)", step: "1" },
+              { key: "autoSyncIntervalMinutes", label: "自動同期間隔 (分)", step: "1" },
+            ] as { key: NumericKey; label: string; step: string; hint?: string }[]).map((f) => {
+              const spec = FIELD_SPEC[f.key];
+              const err = fieldErrors[f.key];
+              return (
+                <div key={f.key}>
+                  <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider block mb-1">{f.label}</label>
+                  <Input
+                    type="number"
+                    value={drafts[f.key] ?? ""}
+                    onChange={(e) => updateDraft(f.key, e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "e" || e.key === "E") e.preventDefault(); }}
+                    className={`h-9 ${err ? "border-red-500 focus-visible:ring-red-500/30" : ""}`}
+                    step={f.step}
+                    min={spec.min}
+                    max={spec.max}
+                    aria-invalid={!!err}
+                    aria-describedby={err ? `${f.key}-err` : undefined}
+                  />
+                  {err && <p id={`${f.key}-err`} className="text-[10px] text-red-500 mt-1">{err}</p>}
+                  {!err && f.hint && <p className="text-[10px] text-muted-foreground/70 mt-1">{f.hint}</p>}
+                </div>
+              );
+            })}
           </div>
 
-          <Button onClick={handleSave} disabled={saving} className="gap-2">
-            {saved ? (
-              <>
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
-                保存しました
-              </>
-            ) : saving ? "保存中..." : "設定を保存"}
-          </Button>
+          <div className="space-y-2">
+            <Button onClick={handleSave} disabled={saving || hasErrors} className="gap-2">
+              {saved ? (
+                <>
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+                  保存しました
+                </>
+              ) : saving ? "保存中..." : hasErrors ? "入力エラーを修正してください" : "設定を保存"}
+            </Button>
+            {saveError && (
+              <p className="text-xs text-red-500">{saveError}</p>
+            )}
+          </div>
         </div>
       </div>
 

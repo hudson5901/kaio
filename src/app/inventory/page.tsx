@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
+import Image from "next/image";
 import type { Item } from "@/lib/db/schema";
 
 const ebayStatusLabels: Record<string, string> = {
@@ -33,6 +34,12 @@ export default function InventoryPage() {
   const [importResult, setImportResult] = useState<string | null>(null);
 
   useEffect(() => { fetchItems(); }, []);
+  // タブ復帰時に再取得
+  useEffect(() => {
+    function onVisible() { if (!document.hidden) fetchItems(); }
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, []);
 
   async function fetchItems() {
     setLoading(true);
@@ -73,12 +80,13 @@ export default function InventoryPage() {
     }
   }
 
-  // Filter
+  // Filter — タブカウントと一致させる
   const filtered = items.filter((item) => {
+    const isDraft = item.ebayStatus === "draft" && item.mercariStatus === "available";
     if (tab === "listed" && item.ebayStatus !== "listed") return false;
-    if (tab === "draft" && item.ebayStatus !== "draft") return false;
+    if (tab === "draft" && !isDraft) return false;
     if (tab === "sold" && item.ebayStatus !== "sold") return false;
-    if (tab === "all" && item.ebayStatus !== "listed" && item.ebayStatus !== "draft" && item.ebayStatus !== "sold") return false;
+    if (tab === "all" && item.ebayStatus !== "listed" && !isDraft && item.ebayStatus !== "sold") return false;
     if (search) {
       const q = search.toLowerCase();
       if (!item.mercariTitle.toLowerCase().includes(q) && !item.ebayTitle?.toLowerCase().includes(q)) return false;
@@ -86,16 +94,17 @@ export default function InventoryPage() {
     return true;
   });
 
-  // Stats
+  // Stats — タブカウントと実フィルタ条件を一致させる (draft は「出品可能」なのでメルカリで在庫ありのみ)
+  const isDraftListable = (i: typeof items[number]) => i.ebayStatus === "draft" && i.mercariStatus === "available";
   const listedCount = items.filter((i) => i.ebayStatus === "listed").length;
-  const draftCount = items.filter((i) => i.ebayStatus === "draft" && i.mercariStatus === "available").length;
+  const draftCount = items.filter(isDraftListable).length;
   const soldCount = items.filter((i) => i.ebayStatus === "sold").length;
   const totalListedValue = items
     .filter((i) => i.ebayStatus === "listed")
     .reduce((sum, i) => sum + (i.ebayPriceUsd || 0), 0);
-  const totalProfit = items
-    .filter((i) => i.ebayStatus === "listed")
-    .reduce((sum, i) => sum + (i.estimatedProfitUsd || 0), 0);
+  const listedItems = items.filter((i) => i.ebayStatus === "listed");
+  const totalProfit = listedItems.reduce((sum, i) => sum + (i.estimatedProfitUsd ?? 0), 0);
+  const pendingCalc = listedItems.filter((i) => i.estimatedProfitUsd == null).length;
 
   const tabs: { key: TabKey; label: string; count: number }[] = [
     { key: "listed", label: "出品中", count: listedCount },
@@ -170,6 +179,9 @@ export default function InventoryPage() {
           <p className={`text-xl font-bold mt-0.5 ${totalProfit > 0 ? "text-emerald-400" : "text-red-400"}`}>
             ${totalProfit.toFixed(0)}
           </p>
+          {pendingCalc > 0 && (
+            <p className="text-[10px] text-amber-400 mt-0.5">⚠ {pendingCalc}件 未計算</p>
+          )}
         </div>
         <div className="rounded-xl bg-card border border-border p-3">
           <p className="text-[11px] text-muted-foreground">販売済み</p>
@@ -248,9 +260,9 @@ export default function InventoryPage() {
                   className="flex items-center gap-3 px-4 py-3 hover:bg-accent/50 transition-colors"
                 >
                   {/* Thumbnail */}
-                  <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 bg-black">
+                  <div className="relative w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 bg-black">
                     {thumb ? (
-                      <img src={thumb} alt="" className="w-full h-full object-cover" />
+                      <Image src={thumb} alt="" fill sizes="48px" className="object-cover" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-muted-foreground/30">
                         <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}><path strokeLinecap="round" strokeLinejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" /></svg>

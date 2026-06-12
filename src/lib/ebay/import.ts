@@ -241,10 +241,9 @@ export async function importEbayListings(): Promise<{
       const description = invItem.product?.description || "";
       const images = invItem.product?.imageUrls || [];
 
-      // Offer 情報を取得して価格と listingId を取得
+      // Offer 情報を取得して価格を取得
       let priceUsd: number | null = null;
       let offerId: string | null = null;
-      let listingId: string | null = null;
       let offerStatus: string | null = null;
 
       try {
@@ -253,7 +252,6 @@ export async function importEbayListings(): Promise<{
           const offer = offers[0]; // 最初のオファーを使用
           offerId = offer.offerId;
           offerStatus = offer.status || null;
-          listingId = offer.listing?.listingId || null;
 
           if (offer.pricingSummary?.price?.value) {
             priceUsd = parseFloat(offer.pricingSummary.price.value);

@@ -192,7 +192,7 @@ async function batchFetchDetails(batchSize: number) {
 
       // タイトル
       const titleMatch = /^#\s+(.+)$/m.exec(markdown);
-      let title = titleMatch ? titleMatch[1].replace(/\s*-\s*メルカリ\s*$/, "").trim() : "";
+      const title = titleMatch ? titleMatch[1].replace(/\s*-\s*メルカリ\s*$/, "").trim() : "";
 
       // 出品者
       const sellerMatch = /出品者[\s\S]*?\[([^\]]+)\]/.exec(markdown);

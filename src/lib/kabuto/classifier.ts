@@ -6,7 +6,7 @@
  * 信頼度が低い場合はClaude Haikuにフォールバック。
  */
 
-import { KABUTO_CATEGORIES, type KabutoCategory, type KabutoCategoryDef } from "./categories";
+import { KABUTO_CATEGORIES, type KabutoCategory } from "./categories";
 
 export interface ClassificationResult {
   category: KabutoCategory;

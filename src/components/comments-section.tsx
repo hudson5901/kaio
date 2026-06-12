@@ -114,6 +114,7 @@ export function CommentsSection({ itemId }: { itemId: string }) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [content, setContent] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [users, setUsers] = useState<User[]>([]);
@@ -170,11 +171,13 @@ export function CommentsSection({ itemId }: { itemId: string }) {
     }
   }, []);
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     fetchComments();
     fetchCurrentUser();
     fetchUsers();
   }, [fetchComments, fetchCurrentUser, fetchUsers]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Compute the caret position in pixels using a mirror div
   const computeCaretPosition = useCallback(() => {
@@ -232,12 +235,19 @@ export function CommentsSection({ itemId }: { itemId: string }) {
     const markerRect = marker.getBoundingClientRect();
 
     // Position relative to the textarea's container
+    // lineHeight が "normal" の場合 parseInt は NaN を返すので fallback を 20px に
+    const lineHeightPx = (() => {
+      const parsed = parseInt(style.lineHeight);
+      if (Number.isFinite(parsed)) return parsed;
+      const fontSize = parseInt(style.fontSize) || 14;
+      return Math.round(fontSize * 1.5);
+    })();
     const top =
       markerRect.top -
       textareaRect.top +
       textarea.offsetTop -
       textarea.scrollTop +
-      parseInt(style.lineHeight || "20");
+      lineHeightPx;
     const left =
       markerRect.left - textareaRect.left + textarea.offsetLeft;
 
@@ -358,6 +368,7 @@ export function CommentsSection({ itemId }: { itemId: string }) {
     if (!content.trim() || !currentUser || submitting) return;
 
     setSubmitting(true);
+    setSubmitError(null);
     try {
       const res = await fetch(`/api/items/${itemId}/comments`, {
         method: "POST",
@@ -372,9 +383,13 @@ export function CommentsSection({ itemId }: { itemId: string }) {
         setContent("");
         setShowMentionDropdown(false);
         await fetchComments();
+      } else {
+        const text = await res.text().catch(() => "");
+        setSubmitError(`コメントの投稿に失敗しました (HTTP ${res.status}${text ? `: ${text.slice(0, 100)}` : ""})`);
       }
     } catch (err) {
       console.error("Failed to post comment:", err);
+      setSubmitError(`コメントの投稿に失敗しました: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setSubmitting(false);
     }
@@ -530,6 +545,9 @@ export function CommentsSection({ itemId }: { itemId: string }) {
                     {submitting ? "送信中..." : "コメント"}
                   </Button>
                 </div>
+                {submitError && (
+                  <p className="text-xs text-red-500 mt-2">{submitError}</p>
+                )}
               </div>
             </div>
           </form>

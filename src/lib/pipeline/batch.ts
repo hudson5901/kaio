@@ -348,7 +348,6 @@ async function batchCalculateCosts(batchSize: number) {
  */
 async function batchClassify(batchSize: number) {
   const { classifyByRules } = await import("@/lib/kabuto/classifier");
-  const { getCategory } = await import("@/lib/kabuto/categories");
 
   const items = await db.query.items.findMany({
     where: and(
@@ -376,22 +375,13 @@ async function batchClassify(batchSize: number) {
         item.mercariDescription || "",
         item.mercariPrice
       );
-      const category = getCategory(result.category);
 
-      const updates: Record<string, unknown> = {
+      // カテゴリ判定のみ保存。寸法・重量・aspects は実測 or 手入力されるまで null。
+      await db.update(schema.items).set({
         kabutoCategory: result.category,
         kabutoCategoryConfidence: result.confidence,
-        ebayAspects: JSON.stringify(category.defaultAspects),
         updatedAt: new Date().toISOString(),
-      };
-
-      // 重量・サイズが未設定ならカテゴリデフォルトを適用
-      if (!item.weightG) updates.weightG = category.defaultWeightG;
-      if (!item.lengthCm) updates.lengthCm = category.defaultDimensions.lengthCm;
-      if (!item.widthCm) updates.widthCm = category.defaultDimensions.widthCm;
-      if (!item.heightCm) updates.heightCm = category.defaultDimensions.heightCm;
-
-      await db.update(schema.items).set(updates).where(eq(schema.items.id, item.id));
+      }).where(eq(schema.items.id, item.id));
       processed++;
     } catch (err) {
       errors.push(`${item.mercariId}: ${err}`);

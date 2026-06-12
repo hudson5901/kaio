@@ -1,9 +1,9 @@
 "use client";
 
 import { Fragment, useEffect, useState, useCallback, useRef } from "react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import Image from "next/image";
 import type { Item, Notification } from "@/lib/db/schema";
 import { STATUS_LABELS as statusLabels } from "@/lib/format";
 
@@ -15,6 +15,7 @@ interface Stats {
   draft: number;
   totalProfit: number;
   totalInvestment: number;
+  pendingCalc: number; // 利益が未計算 (estimatedProfitUsd が null) の件数
 }
 
 interface SchedulerState {
@@ -73,7 +74,7 @@ function StatusDot({ status }: { status: string }) {
 export default function Dashboard() {
   const [items, setItems] = useState<Item[]>([]);
   const [stats, setStats] = useState<Stats>({
-    total: 0, available: 0, listed: 0, sold: 0, draft: 0, totalProfit: 0, totalInvestment: 0,
+    total: 0, available: 0, listed: 0, sold: 0, draft: 0, totalProfit: 0, totalInvestment: 0, pendingCalc: 0,
   });
   const [syncing, setSyncing] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -93,8 +94,10 @@ export default function Dashboard() {
       listed: listItems.filter((i) => i.ebayStatus === "listed").length,
       sold: listItems.filter((i) => i.ebayStatus === "sold").length,
       draft: listItems.filter((i) => i.ebayStatus === "draft").length,
-      totalProfit: listItems.reduce((sum, i) => sum + (i.estimatedProfitUsd || 0), 0),
+      // null は合計に入れず、別途 pendingCalc としてカウント
+      totalProfit: listItems.reduce((sum, i) => sum + (i.estimatedProfitUsd ?? 0), 0),
       totalInvestment: listItems.reduce((sum, i) => sum + (i.mercariPrice || 0), 0),
+      pendingCalc: listItems.filter((i) => i.estimatedProfitUsd == null).length,
     });
   }, []);
 
@@ -114,12 +117,14 @@ export default function Dashboard() {
     } catch { /* ignore */ }
   }, []);
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     fetchItems();
     fetchNotifications();
     fetchScheduler();
     // 通知ポーリングはapp-shellで行うため、ここでは初回取得のみ
   }, [fetchItems, fetchNotifications, fetchScheduler]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // 通知パネル外クリックで閉じる
   useEffect(() => {
@@ -198,12 +203,20 @@ export default function Dashboard() {
   }
 
   const unreadCount = notifications.filter((n) => !n.read).length;
-  const recentItems = items.filter(i => i.decision === "list").slice(0, 8);
+  const recentItems = items
+    .filter(i => i.decision === "list")
+    .slice()
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, 8);
 
   const listItems = items.filter(i => i.decision === "list");
+  // 画像処理待ち = メルカリ画像はあるが processed されていない (画像なしアイテムは対象外)
+  const waitingImageProcess = listItems.filter(
+    i => !i.processedImages && i.mercariImages && i.mercariImages !== "[]"
+  ).length;
   const pipelineStages = [
     { label: "出品判定", count: listItems.length, color: "text-foreground" },
-    { label: "画像処理待ち", count: listItems.filter(i => !i.processedImages).length, color: "text-amber-400" },
+    { label: "画像処理待ち", count: waitingImageProcess, color: "text-amber-400" },
     { label: "出品待ち", count: listItems.filter(i => i.ebayStatus === "draft").length, color: "text-blue-400" },
     { label: "出品中", count: listItems.filter(i => i.ebayStatus === "listed").length, color: "text-emerald-400" },
   ];
@@ -238,8 +251,8 @@ export default function Dashboard() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
               </svg>
               {unreadCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
-                  {unreadCount > 9 ? "9+" : unreadCount}
+                <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+                  {unreadCount > 99 ? "99+" : unreadCount}
                 </span>
               )}
             </button>
@@ -363,7 +376,11 @@ export default function Dashboard() {
           label="推定利益"
           value={`$${stats.totalProfit.toFixed(0)}`}
           color="text-gradient-gold"
-          sub={`投資額 ¥${stats.totalInvestment.toLocaleString()}`}
+          sub={
+            stats.pendingCalc > 0
+              ? `投資額 ¥${stats.totalInvestment.toLocaleString()} ・ ⚠ ${stats.pendingCalc}件 未計算`
+              : `投資額 ¥${stats.totalInvestment.toLocaleString()}`
+          }
           icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0 1 15.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 0 1 3 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 0 0-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 0 1-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 0 0 3 15h-.75M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm3 0h.008v.008H18V10.5Zm-12 0h.008v.008H6V10.5Z" /></svg>}
         />
       </div>
@@ -498,11 +515,9 @@ export default function Dashboard() {
                   }`}
                 >
                   {images[0] ? (
-                    <img
-                      src={images[0]}
-                      alt=""
-                      className="w-9 h-9 rounded object-cover flex-shrink-0"
-                    />
+                    <div className="relative w-9 h-9 rounded overflow-hidden flex-shrink-0">
+                      <Image src={images[0]} alt="" fill sizes="36px" className="object-cover" />
+                    </div>
                   ) : (
                     <div className="w-9 h-9 rounded bg-accent flex-shrink-0 flex items-center justify-center text-muted-foreground/40">
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" /></svg>

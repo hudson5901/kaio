@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { db, schema } from "@/lib/db";
 import { isNull, eq } from "drizzle-orm";
 import { classifyItem } from "@/lib/kabuto/classifier";
-import { getCategory } from "@/lib/kabuto/categories";
 
 export const maxDuration = 300;
 
@@ -23,25 +22,16 @@ export async function POST() {
         item.mercariPrice
       );
 
-      const category = getCategory(result.category);
-
-      const updates: Record<string, unknown> = {
+      // カテゴリと判定信頼度のみ保存。寸法・重量・aspects はデフォルト値を
+      // DB に書き込まず、実測 or 手入力されるまで null のまま。
+      await db.update(schema.items).set({
         kabutoCategory: result.category,
         kabutoCategoryConfidence: result.confidence,
-        ebayAspects: JSON.stringify(category.defaultAspects),
         updatedAt: new Date().toISOString(),
-      };
-
-      if (!item.weightG) updates.weightG = category.defaultWeightG;
-      if (!item.lengthCm) updates.lengthCm = category.defaultDimensions.lengthCm;
-      if (!item.widthCm) updates.widthCm = category.defaultDimensions.widthCm;
-      if (!item.heightCm) updates.heightCm = category.defaultDimensions.heightCm;
-
-      await db.update(schema.items).set(updates).where(eq(schema.items.id, item.id));
+      }).where(eq(schema.items.id, item.id));
       classified++;
       console.log(`[分類] ${classified}/${unclassified.length} ${item.mercariTitle}`);
 
-      // レート制限（AI使う場合があるため）
       if (result.method === "ai") {
         await new Promise((r) => setTimeout(r, 500));
       }

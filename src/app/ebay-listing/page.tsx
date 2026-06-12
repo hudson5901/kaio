@@ -49,15 +49,22 @@ export default function EbayListingPage() {
   const [syncMessage, setSyncMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [search, setSearch] = useState("");
 
+  const [fetchError, setFetchError] = useState<string | null>(null);
   useEffect(() => {
     fetch("/api/items")
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
       .then((data) => {
         if (Array.isArray(data)) {
           setItems(data.filter((i: Item) => i.decision === "list"));
+          setFetchError(null);
+        } else {
+          setFetchError("予期しないレスポンス形式です");
         }
       })
-      .catch(() => {})
+      .catch((e) => setFetchError(`読み込みに失敗しました: ${e instanceof Error ? e.message : String(e)}`))
       .finally(() => setLoading(false));
   }, []);
 
@@ -76,6 +83,33 @@ export default function EbayListingPage() {
     } else {
       setSelected(new Set(items.map((i) => i.id)));
     }
+  }
+
+  // 一括費用再計算 (利益が未計算なアイテムをまとめて再計算)
+  const [recalcRunning, setRecalcRunning] = useState(false);
+  const [recalcMsg, setRecalcMsg] = useState<string | null>(null);
+  async function handleRecalcAll(ids: string[]) {
+    setRecalcRunning(true);
+    setRecalcMsg(null);
+    let ok = 0, fail = 0;
+    for (const id of ids) {
+      try {
+        const r = await fetch(`/api/items/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "calculate_costs" }),
+        });
+        if (r.ok) ok++; else fail++;
+      } catch { fail++; }
+    }
+    setRecalcMsg(`再計算: ${ok}件 成功${fail > 0 ? ` / ${fail}件 失敗` : ""}`);
+    setRecalcRunning(false);
+    // refresh
+    try {
+      const res = await fetch("/api/items");
+      const data = await res.json();
+      if (Array.isArray(data)) setItems(data.filter((i: Item) => i.decision === "list"));
+    } catch { /* ignore */ }
   }
 
   function toggleSort(key: SortKey) {
@@ -222,6 +256,33 @@ export default function EbayListingPage() {
         </div>
       </div>
 
+      {/* 利益未計算アイテム警告バナー */}
+      {(() => {
+        const pendingIds = items.filter((i) => i.estimatedProfitUsd == null).map((i) => i.id);
+        if (pendingIds.length === 0) return null;
+        return (
+          <div className="rounded-lg px-4 py-2.5 text-[13px] bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-3">
+            <span className="text-amber-600 dark:text-amber-400">
+              ⚠ {pendingIds.length}件のアイテムが費用未計算です（利益・送料が「--」表示になります）
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-[12px]"
+              disabled={recalcRunning}
+              onClick={() => handleRecalcAll(pendingIds)}
+            >
+              {recalcRunning ? "再計算中..." : `${pendingIds.length}件 一括再計算`}
+            </Button>
+          </div>
+        );
+      })()}
+      {recalcMsg && (
+        <div className="rounded-lg px-4 py-2 text-[12px] bg-card border border-border text-muted-foreground">
+          {recalcMsg}
+        </div>
+      )}
+
       {/* Sync message toast */}
       {syncMessage && (
         <div
@@ -264,6 +325,13 @@ export default function EbayListingPage() {
           </div>
         );
       })()}
+
+      {/* Fetch error */}
+      {fetchError && (
+        <div className="rounded-lg px-4 py-2.5 text-[13px] bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400">
+          ⚠ {fetchError}
+        </div>
+      )}
 
       {/* Search */}
       <div className="relative">

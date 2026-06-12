@@ -45,7 +45,7 @@ const EBAY_CSV_COLUMNS: EbayCsvColumn[] = [
  */
 function wrapDescription(desc: string): string {
   // 外部マーケットプレイスリンクを除去（eBayはリンク禁止）
-  let cleaned = desc
+  const cleaned = desc
     .replace(/<a[^>]*href=["'][^"']*mercari\.com[^"']*["'][^>]*>.*?<\/a>/gi, "")
     .replace(/https?:\/\/[^\s<"]*mercari\.com[^\s<"]*/gi, "")
     .replace(/<a[^>]*href=["'][^"']*rakuten[^"']*["'][^>]*>.*?<\/a>/gi, "")

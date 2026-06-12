@@ -8,7 +8,7 @@ import { parseDimensions } from "@/lib/mercari/parser";
 // 200件取得は時間がかかるのでタイムアウトを延長
 export const maxDuration = 300; // 5分
 
-async function fetchDetailsBackground(addedCount: number) {
+async function fetchDetailsBackground(_addedCount: number) { // eslint-disable-line @typescript-eslint/no-unused-vars
   // スクレイプ完了後、説明文がないアイテムのdetailsをJinaで取得
   const items = await db.select({
     id: schema.items.id,
