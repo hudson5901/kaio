@@ -237,7 +237,7 @@ export const KABUTO_CATEGORIES: Record<KabutoCategory, KabutoCategoryDef> = {
     defaultWeightG: 8000,
     defaultDimensions: { lengthCm: 60, widthCm: 15, heightCm: 90 },
     promptHints: "This is a Japanese folding screen (byobu) or single-panel partition (tsuitate). Describe the painted scene (landscape, flowers, birds, calligraphy), number of panels, and material (wood, paper, silk).",
-    ebayCategoryId: "20510", // Asian Antiques > Japan > Screens
+    ebayCategoryId: "20507", // Asian Antiques > Japan > Other (旧 20510 Screens は廃止)
     defaultCondition: "USED_GOOD",
     keywords: ["衝立", "屏風", "ついたて", "びょうぶ", "六曲", "二曲", "蒔絵衝立"],
     negativeKeywords: ["兜", "鎧", "刀"],
@@ -509,7 +509,7 @@ export const KABUTO_CATEGORIES: Record<KabutoCategory, KabutoCategoryDef> = {
     defaultWeightG: 1200,
     defaultDimensions: { lengthCm: 30, widthCm: 25, heightCm: 5 },
     promptHints: "Kimono (robe) or obi (sash). Identify garment type: furisode (long sleeve), tomesode (married women), houmongi (visiting), iromuji (solid color), yukata (cotton summer); for obi: maru obi, fukuro obi, nagoya obi. Note fabric (silk, cotton, polyester), dyeing technique (yuzen, shibori, kasuri), motifs, lining condition.",
-    ebayCategoryId: "20510",
+    ebayCategoryId: "20507", // Asian Antiques > Japan > Other (旧 20510 Textiles は廃止)
     defaultCondition: "USED_GOOD",
     keywords: ["着物", "帯", "振袖", "留袖", "訪問着", "袋帯", "名古屋帯", "正絹"],
     negativeKeywords: ["兜", "鎧", "刀"],

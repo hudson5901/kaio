@@ -79,7 +79,7 @@ export async function callTradingApi(
     ignoreAttributes: false,
     removeNSPrefix: true,
     isArray: (name) =>
-      ["Item", "PictureURL", "OrderTransaction"].includes(name),
+      ["Item", "PictureURL", "OrderTransaction", "Errors", "ErrorParameters"].includes(name),
   });
   const parsed = parser.parse(xml);
 
@@ -99,25 +99,45 @@ export async function callTradingApi(
       : response.Errors
         ? [response.Errors as Record<string, unknown>]
         : [];
-    const errMsg = errs
+
+    // 各エラーの ErrorParameters を正規化 (常に配列にする)
+    type NormalizedErr = Record<string, unknown> & { _params: Record<string, unknown>[] };
+    const normalizedErrs: NormalizedErr[] = errs.map((e) => {
+      const rawParams = e.ErrorParameters;
+      const params: Record<string, unknown>[] = Array.isArray(rawParams)
+        ? (rawParams as Record<string, unknown>[])
+        : rawParams
+          ? [rawParams as Record<string, unknown>]
+          : [];
+      return { ...e, _params: params };
+    });
+
+    const errMsg = normalizedErrs
       .map((e) => {
         const code = e.ErrorCode;
         const short = e.ShortMessage || "";
         const long = e.LongMessage && e.LongMessage !== short ? ` — ${e.LongMessage}` : "";
-        const params = Array.isArray(e.ErrorParameters)
-          ? ` (${(e.ErrorParameters as Record<string, unknown>[])
-              .map((p) => `${p.ParamID}=${p.Value}`)
-              .join(", ")})`
-          : e.ErrorParameters
-            ? ` (${(e.ErrorParameters as Record<string, unknown>).ParamID}=${(e.ErrorParameters as Record<string, unknown>).Value})`
-            : "";
+        const params = e._params.length
+          ? ` (${e._params.map((p) => `${p.ParamID}=${p.Value}`).join(", ")})`
+          : "";
         return `[${code}] ${short}${long}${params}`;
       })
       .join("; ") || "Unknown error";
     const err = new Error(`Trading API ${callName} error: ${errMsg}`);
-    (err as Error & { errorCodes?: number[] }).errorCodes = errs
+    (err as Error & { errorCodes?: number[] }).errorCodes = normalizedErrs
       .map((e) => Number(e.ErrorCode))
       .filter((n) => Number.isFinite(n));
+
+    // エラー 20505 (Old category replaced) の代替カテゴリ ID を抽出して err に乗せる
+    // ParamID=0 が旧 ID、ParamID=1 が新 ID というのが eBay の慣例
+    const replaced = normalizedErrs.find((e) => Number(e.ErrorCode) === 20505);
+    if (replaced) {
+      const newCat = replaced._params.find((p) => String(p.ParamID) === "1");
+      if (newCat?.Value) {
+        (err as Error & { suggestedCategoryId?: string }).suggestedCategoryId = String(newCat.Value);
+      }
+    }
+
     // PartialFailure (Warnings扱いされる) は throw しない
     if (response.Ack === "PartialFailure") {
       console.warn(`Trading API ${callName} PartialFailure:`, errMsg);
@@ -231,10 +251,10 @@ export async function addFixedPriceItem(item: {
     ? `<BestOfferDetails><BestOfferEnabled>true</BestOfferEnabled></BestOfferDetails>`
     : "";
 
-  const buildXml = (opts: { includeBestOffer: boolean; useShipProfile: boolean }) => `<Item>
+  const buildXml = (opts: { includeBestOffer: boolean; useShipProfile: boolean; categoryId: string }) => `<Item>
     <Title>${xmlEscape(item.title.slice(0, 80))}</Title>
     <Description><![CDATA[${item.description}]]></Description>
-    <PrimaryCategory><CategoryID>${item.categoryId}</CategoryID></PrimaryCategory>
+    <PrimaryCategory><CategoryID>${opts.categoryId}</CategoryID></PrimaryCategory>
     <StartPrice currencyID="USD">${item.priceUsd.toFixed(2)}</StartPrice>
     <ConditionID>${item.conditionId}</ConditionID>
     <Country>JP</Country>
@@ -252,16 +272,18 @@ export async function addFixedPriceItem(item: {
     ${buildPoliciesXml({ useShipProfile: opts.useShipProfile })}
   </Item>`;
 
-  async function tryAdd(opts: { includeBestOffer: boolean; useShipProfile: boolean }) {
+  async function tryAdd(opts: { includeBestOffer: boolean; useShipProfile: boolean; categoryId: string }) {
     return await callTradingApi("AddFixedPriceItem", buildXml(opts));
   }
 
   let res: Record<string, unknown>;
+  let currentCategoryId = item.categoryId;
   try {
-    res = await tryAdd({ includeBestOffer: bestOfferEnabled, useShipProfile: !!shipProfile });
+    res = await tryAdd({ includeBestOffer: bestOfferEnabled, useShipProfile: !!shipProfile, categoryId: currentCategoryId });
   } catch (err) {
     const codes = (err as Error & { errorCodes?: number[] }).errorCodes ?? [];
     const message = (err as Error).message ?? "";
+    const suggestedCategoryId = (err as Error & { suggestedCategoryId?: string }).suggestedCategoryId;
 
     // SKU 重複 (21916564) は ReviseFixedPriceItem で既存出品を更新するべきもの
     if (codes.includes(21916564)) {
@@ -270,9 +292,17 @@ export async function addFixedPriceItem(item: {
       );
     }
 
+    // [107] Category is not valid かつ [20505] で新カテゴリが提示されてたら、新ID で再試行
+    if (codes.includes(107) && suggestedCategoryId && suggestedCategoryId !== currentCategoryId) {
+      console.warn(
+        `[trading] AddFixedPriceItem sku=${item.sku} category ${currentCategoryId} invalid, retrying with ${suggestedCategoryId}`
+      );
+      currentCategoryId = suggestedCategoryId;
+      res = await tryAdd({ includeBestOffer: bestOfferEnabled, useShipProfile: !!shipProfile, categoryId: currentCategoryId });
+    }
     // [37] かつ SellerShippingProfile を eBay が拒否してたら、profile を外して
     // インライン送料で再試行 (カテゴリ制限などで profile が使えないとき)
-    if (
+    else if (
       codes.includes(37) &&
       !!shipProfile &&
       /SellerShippingProfile|ShippingProfileID/i.test(message)
@@ -281,13 +311,13 @@ export async function addFixedPriceItem(item: {
         `[trading] AddFixedPriceItem sku=${item.sku} shipping profile rejected, retrying with inline ShippingDetails`
       );
       try {
-        res = await tryAdd({ includeBestOffer: bestOfferEnabled, useShipProfile: false });
+        res = await tryAdd({ includeBestOffer: bestOfferEnabled, useShipProfile: false, categoryId: currentCategoryId });
       } catch (err2) {
         // それでもダメで [37] かつ BestOffer なら BestOffer も外す
         const codes2 = (err2 as Error & { errorCodes?: number[] }).errorCodes ?? [];
         if (bestOfferEnabled && codes2.includes(37)) {
           console.warn(`[trading] AddFixedPriceItem sku=${item.sku} retrying without BestOffer too`);
-          res = await tryAdd({ includeBestOffer: false, useShipProfile: false });
+          res = await tryAdd({ includeBestOffer: false, useShipProfile: false, categoryId: currentCategoryId });
         } else {
           throw err2;
         }
@@ -298,7 +328,7 @@ export async function addFixedPriceItem(item: {
       console.warn(
         `[trading] AddFixedPriceItem sku=${item.sku} error 37 with BestOffer, retrying without it`
       );
-      res = await tryAdd({ includeBestOffer: false, useShipProfile: !!shipProfile });
+      res = await tryAdd({ includeBestOffer: false, useShipProfile: !!shipProfile, categoryId: currentCategoryId });
     } else {
       throw err;
     }
