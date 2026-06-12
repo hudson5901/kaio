@@ -1,14 +1,15 @@
 /**
- * 利益計算エンジン
+ * 利益計算エンジン (送料無料出品 + DDP 想定)
  *
- * 純利益 = (販売価格 + 売上税6%) - eBay手数料16% - 広告費5% - 売上税6% - 関税10% - 送料 - 仕入
+ * 純利益 = (販売価格 + 売上税6%) - eBay手数料16% - 広告費5%
+ *         - 売上税6% - 関税10% - 送料 - 仕入
  *
- * 内訳（円建て、ebayPrice = 販売価格×為替）:
- *   - 受領総額       = ebayPrice × (1 + salesTax)        ← buyerから受け取る総額
- *   - eBay手数料     = 受領総額 × ebayFee%                ← 売上税込ベースで請求
- *   - 広告費         = 受領総額 × ad%                     ← 売上税込ベースで請求
- *   - 売上税remit    = ebayPrice × salesTax              ← 州税納付
- *   - 関税           = ebayPrice × customs%               ← 古美術 10%
+ * 内訳（円建て、price = ebayPriceUsd × exchangeRate）:
+ *   - 受領総額       = price × (1 + salesTax)               ← buyerが払う総額
+ *   - eBay手数料     = 受領総額 × ebayFee%                   ← 売上税込で請求、送料は含めない
+ *   - 広告費         = 受領総額 × ad%                        ← 売上税込で請求、送料は含めない
+ *   - 売上税remit    = price × salesTax                     ← buyer徴収分を州に納付 (パススルー)
+ *   - 関税           = (price + 送料) × customs%             ← DDP想定で Declared Value に
  *   - 送料           = FedEx IP テーブル (実重量と容積重量のmax)
  *   - 仕入           = メルカリ価格
  *
@@ -193,10 +194,11 @@ export function calculateCosts(params: {
   const shippingCostUsd = shippingCostJpy / exchangeRate;
 
   // --- eBay販売価格 ---
-  // 純利益 = 売上×(1+tax) - 売上×(1+tax)×(fee+ad) - 売上×tax - 売上×customs - 送料 - 仕入
-  //       = 売上 × k - 送料 - 仕入,  where k = (1+tax)(1-fee-ad) - tax - customs
+  // 純利益 = 売上×(1+tax) - 売上×(1+tax)×(fee+ad) - 売上×tax - (売上+送料)×customs - 送料 - 仕入
+  //       = 売上 × k - 送料 × (1+customs) - 仕入
+  //         where k = (1+tax)(1-fee-ad) - tax - customs
   // 目標: 純利益 = 仕入 × margin
-  // → 売上 = (仕入×(1+margin) + 送料) / k
+  // → 売上 = (仕入×(1+margin) + 送料×(1+customs)) / k
   const profitCoefficient =
     (1 + salesTaxRate) * (1 - ebayFeeRate - adRate) - salesTaxRate - customsRate;
 
@@ -204,7 +206,9 @@ export function calculateCosts(params: {
   if (params.ebayPriceUsd && params.ebayPriceUsd > 0) {
     ebayPriceUsd = params.ebayPriceUsd;
   } else {
-    const numerator = mercariPriceJpy * (1 + profitMargin) + shippingCostJpy;
+    const numerator =
+      mercariPriceJpy * (1 + profitMargin) +
+      shippingCostJpy * (1 + customsRate);
     const denominator = exchangeRate * profitCoefficient;
     ebayPriceUsd = Math.ceil(numerator / denominator);
   }
@@ -214,13 +218,13 @@ export function calculateCosts(params: {
   const grossWithTaxJpy = revenueJpy * (1 + salesTaxRate);
 
   // --- 各費用（円建て）---
-  // eBay手数料・広告費は 売上税込のグロス で請求される
+  // eBay手数料・広告費は 売上税込のグロス で請求される (送料無料出品想定: 送料は基礎に含めない)
   const ebayFeeJpy = grossWithTaxJpy * ebayFeeRate;
   const adCostJpy = grossWithTaxJpy * adRate;
   // 売上税は buyer から受け取った分を州に納付 (実質パススルー)
   const salesTaxJpy = revenueJpy * salesTaxRate;
-  // 関税は売上に対して
-  const customsDutyJpy = revenueJpy * customsRate;
+  // 関税は DDP 想定で (販売価格+送料) を Declared Value として 10%
+  const customsDutyJpy = (revenueJpy + shippingCostJpy) * customsRate;
 
   // --- 純利益（円）---
   // 受領総額 - eBay手数料 - 広告費 - 売上税納付 - 関税 - 送料 - 仕入
