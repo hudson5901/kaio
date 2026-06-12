@@ -76,12 +76,17 @@ export async function runSyncBatch(batchSize = 20): Promise<SyncResult> {
       }
 
       // updatedAt を更新（次バッチでは後回しになる）
+      // sold/deleted の場合は decision を "out_of_stock" に自動設定 (パス/未判定とは別ステータス)
+      const updates: Partial<typeof schema.items.$inferInsert> = {
+        mercariStatus: status,
+        updatedAt: new Date().toISOString(),
+      };
+      if (status === "sold" || status === "deleted") {
+        updates.decision = "out_of_stock";
+      }
       await db
         .update(schema.items)
-        .set({
-          mercariStatus: status,
-          updatedAt: new Date().toISOString(),
-        })
+        .set(updates)
         .where(eq(schema.items.id, item.id));
 
       if (status === "sold") {

@@ -248,10 +248,19 @@ export async function PATCH(
     }
 
     case "list_on_ebay": {
-      const { createEbayListing } = await import("@/lib/ebay/inventory");
-      const publish = body.publish !== false; // default true (即時公開)
-      const result = await createEbayListing(item, { publish });
-      return NextResponse.json(result);
+      try {
+        const { createEbayListing } = await import("@/lib/ebay/inventory");
+        const publish = body.publish !== false;
+        const result = await createEbayListing(item, { publish });
+        return NextResponse.json(result);
+      } catch (err) {
+        console.error(`[list_on_ebay] item=${id} failed:`, err);
+        const message = err instanceof Error ? err.message : String(err);
+        return NextResponse.json(
+          { error: "eBay出品に失敗しました", message },
+          { status: 500 }
+        );
+      }
     }
 
     case "remove_from_ebay": {

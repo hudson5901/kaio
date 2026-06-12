@@ -81,9 +81,9 @@ export const items = pgTable("items", {
   kabutoCategoryConfidence: real("kabuto_category_confidence"), // 0.0~1.0
   ebayAspects: text("ebay_aspects"), // JSON: {"Type": ["Kabuto"], "Material": ["Iron"], ...}
 
-  // 判定ステータス (出品/検討/パス)
+  // 判定ステータス (出品/検討/パス/メルカリ在庫なし)
   decision: text("decision", {
-    enum: ["list", "considering", "pass"],
+    enum: ["list", "considering", "pass", "out_of_stock"],
   }),
 
   // AIスコアリング

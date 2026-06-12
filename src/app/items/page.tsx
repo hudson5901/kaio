@@ -222,6 +222,7 @@ export default function ItemsPage() {
           { value: "list", label: "出品", count: items.filter(i => i.decision === "list").length },
           { value: "considering", label: "検討", count: items.filter(i => i.decision === "considering").length },
           { value: "pass", label: "パス", count: items.filter(i => i.decision === "pass").length },
+          { value: "out_of_stock", label: "メルカリ在庫なし", count: items.filter(i => i.decision === "out_of_stock").length },
         ] as const).map(({ value, label, count }) => (
           <button
             key={value}
