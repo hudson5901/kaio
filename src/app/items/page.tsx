@@ -26,7 +26,7 @@ function StatusDot({ status }: { status: string }) {
 
 type SortKey = "date" | "updated" | "price_asc" | "price_desc" | "profit_desc" | "profit_asc" | "ebay_price" | "ai_score" | "likes_desc";
 
-const ITEMS_PER_PAGE = 30;
+const PAGE_SIZE_OPTIONS = [30, 100, 200, 500, 1000] as const;
 
 export default function ItemsPage() {
   const [items, setItems] = useState<Item[]>([]);
@@ -43,6 +43,7 @@ export default function ItemsPage() {
   const [bulkLoading, setBulkLoading] = useState<string | null>(null);
   const [confirmBulk, setConfirmBulk] = useState<{ action: string; ids: string[]; message: string } | null>(null);
   const [exchangeRate, setExchangeRate] = useState<number>(160);
+  const [pageSize, setPageSize] = useState<number>(30);
 
   useEffect(() => { fetchItems(); }, []);
 
@@ -60,7 +61,7 @@ export default function ItemsPage() {
   }, [search]);
 
   // フィルタ変更時にページリセット
-  useEffect(() => { setPage(1); }, [debouncedSearch, mercariFilter, ebayFilter, decisionFilter, sortKey]);
+  useEffect(() => { setPage(1); }, [debouncedSearch, mercariFilter, ebayFilter, decisionFilter, sortKey, pageSize]);
 
   const filtered = useMemo(() => {
     let result = items;
@@ -81,6 +82,7 @@ export default function ItemsPage() {
     if (decisionFilter !== "all") {
       if (decisionFilter === "none") result = result.filter((i) => !i.decision);
       else if (decisionFilter === "auto_pass") result = result.filter((i) => !i.decision && checkShouldPass(i.mercariTitle, i.mercariDescription, i.mercariPrice).shouldPass);
+      else if (decisionFilter === "ebay_listed") result = result.filter((i) => i.ebayStatus === "listed");
       else result = result.filter((i) => i.decision === decisionFilter);
     }
 
@@ -103,8 +105,8 @@ export default function ItemsPage() {
     return result;
   }, [items, debouncedSearch, mercariFilter, ebayFilter, decisionFilter, sortKey]);
 
-  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
-  const paged = filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
+  const totalPages = Math.ceil(filtered.length / pageSize);
+  const paged = filtered.slice((page - 1) * pageSize, page * pageSize);
 
   // フィルタ済みIDリストをsessionStorageに保存（詳細ページの前後ナビで使用）
   useEffect(() => {
@@ -142,10 +144,23 @@ export default function ItemsPage() {
     }
   }
 
+  function selectAllFiltered() {
+    setSelected(new Set(filtered.map((i) => i.id)));
+  }
+
   function handleBulkAction(action: string) {
     const targetIds = selected.size > 0 ? [...selected] : filtered.filter(i => i.mercariStatus === "available").map(i => i.id);
     if (targetIds.length === 0) return;
-    const actionLabel = action === "calculate_costs" ? "費用計算" : action === "process_images" ? "画像処理" : action === "delete" ? "削除" : action;
+    const labelMap: Record<string, string> = {
+      calculate_costs: "費用計算",
+      process_images: "画像処理",
+      delete: "削除",
+      decide_pass: "パス判定",
+      decide_list: "出品判定",
+      decide_considering: "検討判定",
+      decide_clear: "判定クリア",
+    };
+    const actionLabel = labelMap[action] || action;
     const message = selected.size > 0
       ? `選択した${targetIds.length}件に「${actionLabel}」を実行します。`
       : `フィルタ対象の${targetIds.length}件に「${actionLabel}」を実行します。`;
@@ -154,22 +169,38 @@ export default function ItemsPage() {
 
   async function executeBulkAction(action: string, targetIds: string[]) {
     setBulkLoading(action);
-    if (action === "delete") {
-      for (const id of targetIds) {
-        await fetch(`/api/items/${id}`, { method: "DELETE" });
+    try {
+      if (action === "delete") {
+        await Promise.all(
+          targetIds.map((id) => fetch(`/api/items/${id}`, { method: "DELETE" }))
+        );
+      } else if (action.startsWith("decide_")) {
+        const decision =
+          action === "decide_clear" ? null : action.replace("decide_", "");
+        await Promise.all(
+          targetIds.map((id) =>
+            fetch(`/api/items/${id}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ action: "update", decision }),
+            })
+          )
+        );
+      } else {
+        // 既存: calculate_costs / process_images など、サーバ負荷高めなので順次
+        for (const id of targetIds) {
+          await fetch(`/api/items/${id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action }),
+          });
+        }
       }
-    } else {
-      for (const id of targetIds) {
-        await fetch(`/api/items/${id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action }),
-        });
-      }
+    } finally {
+      setBulkLoading(null);
+      setSelected(new Set());
+      fetchItems();
     }
-    setBulkLoading(null);
-    setSelected(new Set());
-    fetchItems();
   }
 
   // 統計
@@ -214,6 +245,7 @@ export default function ItemsPage() {
           { value: "considering", label: "検討", count: items.filter(i => i.decision === "considering").length },
           { value: "pass", label: "パス", count: items.filter(i => i.decision === "pass").length },
           { value: "out_of_stock", label: "メルカリ在庫なし", count: items.filter(i => i.decision === "out_of_stock").length },
+          { value: "ebay_listed", label: "出品中", count: items.filter(i => i.ebayStatus === "listed").length },
         ] as const).map(({ value, label, count }) => (
           <button
             key={value}
@@ -317,8 +349,13 @@ export default function ItemsPage() {
 
         {/* Bulk Actions Bar */}
         {selected.size > 0 && (
-          <div className="flex items-center gap-3 rounded-lg bg-accent/80 px-4 py-2 animate-in slide-in-from-top-2">
+          <div className="flex items-center gap-3 rounded-lg bg-accent/80 px-4 py-2 animate-in slide-in-from-top-2 flex-wrap">
             <span className="text-[13px] font-medium">{selected.size}件選択中</span>
+            {selected.size < filtered.length && (
+              <button onClick={selectAllFiltered} className="text-[12px] text-primary hover:underline">
+                フィルタ全{filtered.length}件を選択
+              </button>
+            )}
             <div className="w-px h-4 bg-border" />
             <Button variant="outline" size="sm" className="h-7 text-[12px]" onClick={() => handleBulkAction("calculate_costs")} disabled={!!bulkLoading}>
               {bulkLoading === "calculate_costs" ? "計算中..." : "費用計算"}
@@ -326,6 +363,21 @@ export default function ItemsPage() {
             <Button variant="outline" size="sm" className="h-7 text-[12px]" onClick={() => handleBulkAction("process_images")} disabled={!!bulkLoading}>
               {bulkLoading === "process_images" ? "処理中..." : "画像処理"}
             </Button>
+            <div className="w-px h-4 bg-border" />
+            <span className="text-[11px] text-muted-foreground/70">判定:</span>
+            <Button variant="outline" size="sm" className="h-7 text-[12px] border-emerald-500/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10" onClick={() => handleBulkAction("decide_list")} disabled={!!bulkLoading}>
+              {bulkLoading === "decide_list" ? "..." : "出品"}
+            </Button>
+            <Button variant="outline" size="sm" className="h-7 text-[12px] border-amber-500/40 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10" onClick={() => handleBulkAction("decide_considering")} disabled={!!bulkLoading}>
+              {bulkLoading === "decide_considering" ? "..." : "検討"}
+            </Button>
+            <Button variant="outline" size="sm" className="h-7 text-[12px] border-red-500/40 text-red-600 dark:text-red-400 hover:bg-red-500/10" onClick={() => handleBulkAction("decide_pass")} disabled={!!bulkLoading}>
+              {bulkLoading === "decide_pass" ? "..." : "パス"}
+            </Button>
+            <Button variant="ghost" size="sm" className="h-7 text-[12px]" onClick={() => handleBulkAction("decide_clear")} disabled={!!bulkLoading}>
+              クリア
+            </Button>
+            <div className="w-px h-4 bg-border" />
             <Button variant="destructive" size="sm" className="h-7 text-[12px]" onClick={() => handleBulkAction("delete")} disabled={!!bulkLoading}>
               {bulkLoading === "delete" ? "削除中..." : "削除"}
             </Button>
@@ -604,8 +656,20 @@ export default function ItemsPage() {
             次へ
           </Button>
           <span className="text-[11px] text-muted-foreground/60 ml-2 tabular-nums">
-            {(page - 1) * ITEMS_PER_PAGE + 1}-{Math.min(page * ITEMS_PER_PAGE, filtered.length)} / {filtered.length}件
+            {(page - 1) * pageSize + 1}-{Math.min(page * pageSize, filtered.length)} / {filtered.length}件
           </span>
+          <div className="ml-auto flex items-center gap-1.5">
+            <span className="text-[11px] text-muted-foreground/60">表示</span>
+            <select
+              value={pageSize}
+              onChange={(e) => setPageSize(parseInt(e.target.value, 10))}
+              className="h-7 rounded-md border border-border bg-background px-2 text-[12px] tabular-nums"
+            >
+              {PAGE_SIZE_OPTIONS.map((n) => (
+                <option key={n} value={n}>{n}件</option>
+              ))}
+            </select>
+          </div>
         </div>
       )}
 
