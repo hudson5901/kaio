@@ -116,6 +116,48 @@ export async function PATCH(
       return NextResponse.json(costs);
     }
 
+    case "set_price": {
+      // eBay販売価格を手動で固定 (利益率下限フロアを無視)
+      const priceUsd = Number(body.ebayPriceUsd);
+      if (!Number.isFinite(priceUsd) || priceUsd < 0) {
+        return NextResponse.json(
+          { error: "Invalid ebayPriceUsd" },
+          { status: 400 }
+        );
+      }
+      const { calculateCostsWithLiveRate } = await import("@/lib/shipping/calculator");
+      const { getSettings } = await import("@/lib/settings");
+      const settings = await getSettings();
+      const costs = await calculateCostsWithLiveRate({
+        mercariPriceJpy: item.mercariPrice,
+        ebayPriceUsd: priceUsd,
+        weightG: item.weightG,
+        lengthCm: item.lengthCm,
+        widthCm: item.widthCm,
+        heightCm: item.heightCm,
+        kabutoCategory: item.kabutoCategory,
+        ebayFeeRate: settings.ebayFeePercent / 100,
+        adRate: settings.adPercent / 100,
+        customsRate: settings.customsDutyPercent / 100,
+        salesTaxRate: settings.salesTaxPercent / 100,
+        profitMargin: settings.profitMarginPercent / 100,
+        shippingCostUsdOverride: item.shippingCostUsd ?? undefined,
+      });
+      await db
+        .update(schema.items)
+        .set({
+          ebayPriceUsd: priceUsd,
+          shippingCostUsd: costs.shippingCostUsd,
+          customsDutyUsd: costs.customsDutyUsd,
+          ebayFeeUsd: costs.ebayFeeUsd,
+          adCostUsd: costs.adCostUsd,
+          estimatedProfitUsd: costs.profitUsd,
+          updatedAt: new Date().toISOString(),
+        })
+        .where(eq(schema.items.id, id));
+      return NextResponse.json(costs);
+    }
+
     case "set_shipping": {
       // 送料を手動上書き。FedEx テーブルではなくこの値で各種費用を再計算
       const shippingUsd = Number(body.shippingCostUsd);

@@ -190,34 +190,33 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
     if (res.ok) setItem(await res.json());
   }
 
-  // 価格保存: form submit / input blur のどちらからも呼ばれる
+  // 価格保存: 利益率下限フロアを無視して手動価格を固定 (set_price アクション)
   async function savePrice() {
     if (savingPrice || !item) return;
     const val = parseFloat(draftPrice);
-    // 無効値 or 変更なし → 編集モードだけ閉じる
-    if (isNaN(val) || val <= 0 || val === item.ebayPriceUsd) {
+    if (isNaN(val) || val < 0 || val === item.ebayPriceUsd) {
       setEditingPrice(false);
       return;
     }
     setSavingPrice(true);
     try {
       const oldPrice = item.ebayPriceUsd;
-      await fetch(`/api/items/${item.id}`, {
+      const res = await fetch(`/api/items/${item.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ebayPriceUsd: val }),
+        body: JSON.stringify({ action: "set_price", ebayPriceUsd: val }),
       });
+      if (!res.ok) {
+        showItemToast("error", "価格の保存に失敗しました");
+        return;
+      }
+      const newCosts = await res.json();
+      setCosts(newCosts);
       await fetch(`/api/items/${item.id}/comments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: `eBay販売価格を $${oldPrice || 0} → $${val} に変更しました` }),
-      });
-      const costRes = await fetch(`/api/items/${item.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "calculate_costs" }),
-      });
-      if (costRes.ok) setCosts(await costRes.json());
+        body: JSON.stringify({ content: `eBay販売価格を $${oldPrice ?? 0} → $${val} に手動変更しました` }),
+      }).catch(() => {});
       setEditingPrice(false);
       await fetchItem();
     } finally {

@@ -469,7 +469,7 @@ export default function ItemsPage() {
                   </div>
                   <div className="p-3">
                     <p className="text-[13px] font-medium truncate leading-snug">{item.mercariTitle}</p>
-                    {item.estimatedProfitUsd != null && (
+                    {item.estimatedProfitUsd != null && (item.mercariPrice ?? 0) > 0 && (
                       <div className="mt-1.5 flex items-baseline gap-1.5">
                         <span className={`text-[13px] font-semibold tabular-nums ${item.estimatedProfitUsd > 0 ? "text-emerald-500" : "text-red-400"}`}>
                           利益 ${item.estimatedProfitUsd.toFixed(0)}
@@ -479,8 +479,11 @@ export default function ItemsPage() {
                         </span>
                       </div>
                     )}
+                    {(item.mercariPrice ?? 0) === 0 && (
+                      <div className="mt-1.5 text-[11px] text-muted-foreground/60">仕入れ未入力 (eBay取込)</div>
+                    )}
                     <div className="flex items-center justify-between mt-1">
-                      <span className="text-[12px] text-muted-foreground tabular-nums">¥{(item.mercariPrice || 0).toLocaleString()}</span>
+                      <span className="text-[12px] text-muted-foreground tabular-nums">{(item.mercariPrice ?? 0) > 0 ? `¥${item.mercariPrice!.toLocaleString()}` : <span className="text-muted-foreground/40">--</span>}</span>
                       {item.ebayPriceUsd ? (
                         <span className="text-[12px] font-medium text-primary tabular-nums">${item.ebayPriceUsd}</span>
                       ) : null}

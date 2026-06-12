@@ -377,10 +377,12 @@ export default function EbayListingPage() {
                   <Link href={`/items/${item.id}?from=ebay-listing`} className="truncate pr-3">
                     <span className="text-[13px] font-medium hover:text-primary transition-colors">{item.mercariTitle}</span>
                   </Link>
-                  <span className={`text-[13px] text-right tabular-nums font-medium ${item.estimatedProfitUsd && item.estimatedProfitUsd > 0 ? "text-emerald-500" : item.estimatedProfitUsd ? "text-red-400" : ""}`}>
-                    {item.estimatedProfitUsd != null ? `$${item.estimatedProfitUsd.toFixed(0)}` : <span className="text-muted-foreground/30">--</span>}
+                  <span className={`text-[13px] text-right tabular-nums font-medium ${(item.mercariPrice ?? 0) > 0 && item.estimatedProfitUsd && item.estimatedProfitUsd > 0 ? "text-emerald-500" : (item.mercariPrice ?? 0) > 0 && item.estimatedProfitUsd ? "text-red-400" : ""}`}>
+                    {(item.mercariPrice ?? 0) > 0 && item.estimatedProfitUsd != null
+                      ? `$${item.estimatedProfitUsd.toFixed(0)}`
+                      : <span className="text-muted-foreground/30">--</span>}
                   </span>
-                  <span className="hidden sm:block text-[13px] text-right tabular-nums text-muted-foreground">¥{(item.mercariPrice || 0).toLocaleString()}</span>
+                  <span className="hidden sm:block text-[13px] text-right tabular-nums text-muted-foreground">{(item.mercariPrice ?? 0) > 0 ? `¥${item.mercariPrice!.toLocaleString()}` : <span className="text-muted-foreground/30">--</span>}</span>
                   <span className="hidden sm:block text-[13px] text-right tabular-nums">{item.ebayPriceUsd ? `$${item.ebayPriceUsd}` : <span className="text-muted-foreground/30">--</span>}</span>
                   <span className="hidden sm:block text-[13px] text-right tabular-nums text-muted-foreground">{item.shippingCostUsd ? `$${item.shippingCostUsd.toFixed(1)}` : <span className="text-muted-foreground/30">--</span>}</span>
                   <div className="hidden sm:flex justify-center">
