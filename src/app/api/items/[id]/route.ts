@@ -75,6 +75,38 @@ export async function PATCH(
       }
     }
 
+    case "reorder_processed_images": {
+      // body.order = 新しい並び順 (現配列のインデックスを並べた配列)
+      // 例: 元 [A,B,C,D] → order [2,0,1,3] → 新 [C,A,B,D]
+      const order = body.order;
+      const current: string[] = item.processedImages
+        ? JSON.parse(item.processedImages)
+        : [];
+      if (
+        !Array.isArray(order) ||
+        order.length !== current.length ||
+        !order.every((n) => Number.isInteger(n) && n >= 0 && n < current.length)
+      ) {
+        return NextResponse.json({ error: "Invalid order" }, { status: 400 });
+      }
+      const seen = new Set<number>();
+      for (const n of order) {
+        if (seen.has(n)) {
+          return NextResponse.json({ error: "Order contains duplicates" }, { status: 400 });
+        }
+        seen.add(n);
+      }
+      const next = (order as number[]).map((i) => current[i]);
+      await db
+        .update(schema.items)
+        .set({
+          processedImages: JSON.stringify(next),
+          updatedAt: new Date().toISOString(),
+        })
+        .where(eq(schema.items.id, id));
+      return NextResponse.json({ processedImages: next });
+    }
+
     case "remove_processed_image": {
       const index = Number(body.index);
       if (!Number.isInteger(index) || index < 0) {

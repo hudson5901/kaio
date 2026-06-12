@@ -92,7 +92,7 @@ export async function callTradingApi(
     );
   }
 
-  if (response.Ack === "Failure") {
+  if (response.Ack === "Failure" || response.Ack === "PartialFailure") {
     // Errors が配列のときと単一オブジェクトの両方に対応
     const errs = Array.isArray(response.Errors)
       ? (response.Errors as Record<string, unknown>[])
@@ -100,12 +100,29 @@ export async function callTradingApi(
         ? [response.Errors as Record<string, unknown>]
         : [];
     const errMsg = errs
-      .map((e) => `[${e.ErrorCode}] ${e.ShortMessage || e.LongMessage}`)
+      .map((e) => {
+        const code = e.ErrorCode;
+        const short = e.ShortMessage || "";
+        const long = e.LongMessage && e.LongMessage !== short ? ` — ${e.LongMessage}` : "";
+        const params = Array.isArray(e.ErrorParameters)
+          ? ` (${(e.ErrorParameters as Record<string, unknown>[])
+              .map((p) => `${p.ParamID}=${p.Value}`)
+              .join(", ")})`
+          : e.ErrorParameters
+            ? ` (${(e.ErrorParameters as Record<string, unknown>).ParamID}=${(e.ErrorParameters as Record<string, unknown>).Value})`
+            : "";
+        return `[${code}] ${short}${long}${params}`;
+      })
       .join("; ") || "Unknown error";
     const err = new Error(`Trading API ${callName} error: ${errMsg}`);
     (err as Error & { errorCodes?: number[] }).errorCodes = errs
       .map((e) => Number(e.ErrorCode))
       .filter((n) => Number.isFinite(n));
+    // PartialFailure (Warnings扱いされる) は throw しない
+    if (response.Ack === "PartialFailure") {
+      console.warn(`Trading API ${callName} PartialFailure:`, errMsg);
+      return response;
+    }
     throw err;
   }
 
@@ -201,11 +218,16 @@ export async function addFixedPriceItem(item: {
 
   const policiesXml = `${sellerProfilesXml}${inlineShippingXml}${inlineReturnXml}`;
 
-  // Best Offer (Allow offers) を全出品で有効化。
+  // Best Offer (Allow offers) を全出品で有効化。env=off で無効化可能。
   // buyer が金額提示でき、seller が accept/counter/decline できる。
-  const bestOfferXml = `<BestOfferDetails><BestOfferEnabled>true</BestOfferEnabled></BestOfferDetails>`;
+  // 一部カテゴリで [37] Input data is invalid を引き起こすことが知られているので、
+  // 失敗時は BestOffer 無しでフォールバック再試行する。
+  const bestOfferEnabled = process.env.EBAY_BEST_OFFER !== "off";
+  const bestOfferXml = bestOfferEnabled
+    ? `<BestOfferDetails><BestOfferEnabled>true</BestOfferEnabled></BestOfferDetails>`
+    : "";
 
-  const xmlBody = `<Item>
+  const buildXml = (includeBestOffer: boolean) => `<Item>
     <Title>${xmlEscape(item.title.slice(0, 80))}</Title>
     <Description><![CDATA[${item.description}]]></Description>
     <PrimaryCategory><CategoryID>${item.categoryId}</CategoryID></PrimaryCategory>
@@ -222,22 +244,40 @@ export async function addFixedPriceItem(item: {
     <DispatchTimeMax>5</DispatchTimeMax>
     <PictureDetails>${pictureXml}</PictureDetails>
     ${aspectXml ? `<ItemSpecifics>${aspectXml}</ItemSpecifics>` : ""}
-    ${bestOfferXml}
+    ${includeBestOffer ? bestOfferXml : ""}
     ${policiesXml}
   </Item>`;
 
+  async function tryAdd(includeBestOffer: boolean) {
+    return await callTradingApi("AddFixedPriceItem", buildXml(includeBestOffer));
+  }
+
   let res: Record<string, unknown>;
   try {
-    res = await callTradingApi("AddFixedPriceItem", xmlBody);
+    res = await tryAdd(bestOfferEnabled);
   } catch (err) {
-    // SKU 重複 (21916564) は ReviseFixedPriceItem で既存出品を更新
     const codes = (err as Error & { errorCodes?: number[] }).errorCodes ?? [];
+
+    // SKU 重複 (21916564) は ReviseFixedPriceItem で既存出品を更新するべきもの
     if (codes.includes(21916564)) {
       throw new Error(
         `この SKU (${item.sku}) は eBay 上で既に使われています。先に取り下げるか、別の SKU で出品してください。`
       );
     }
-    throw err;
+
+    // [37] Input data is invalid を BestOffer 付きで食らったら、BestOffer 無しで再試行
+    if (bestOfferEnabled && codes.includes(37)) {
+      console.warn(
+        `[trading] AddFixedPriceItem sku=${item.sku} error 37 with BestOffer, retrying without it`
+      );
+      try {
+        res = await tryAdd(false);
+      } catch (err2) {
+        throw err2;
+      }
+    } else {
+      throw err;
+    }
   }
   const itemId = String(res.ItemID ?? "");
   if (!itemId) {
@@ -255,6 +295,37 @@ export async function endFixedPriceItem(itemId: string): Promise<void> {
     "EndFixedPriceItem",
     `<ItemID>${itemId}</ItemID><EndingReason>NotAvailable</EndingReason>`
   );
+}
+
+/**
+ * ReviseFixedPriceItem で出品済みアイテムのタイトル/説明文/aspects を更新。
+ * 出品中のリスティングそのものを書き換えるので、買い手が見る内容が即時更新される。
+ */
+export async function reviseFixedPriceItem(args: {
+  itemId: string;
+  title?: string;
+  description?: string;
+  aspects?: Record<string, string[]>;
+}): Promise<void> {
+  const parts: string[] = [`<ItemID>${args.itemId}</ItemID>`];
+  if (args.title) {
+    parts.push(`<Title>${xmlEscape(args.title.slice(0, 80))}</Title>`);
+  }
+  if (args.description) {
+    parts.push(`<Description><![CDATA[${args.description}]]></Description>`);
+  }
+  if (args.aspects && Object.keys(args.aspects).length > 0) {
+    const aspectXml = Object.entries(args.aspects)
+      .flatMap(([name, values]) =>
+        values.map(
+          (v) =>
+            `<NameValueList><Name>${xmlEscape(name)}</Name><Value>${xmlEscape(String(v))}</Value></NameValueList>`
+        )
+      )
+      .join("");
+    parts.push(`<ItemSpecifics>${aspectXml}</ItemSpecifics>`);
+  }
+  await callTradingApi("ReviseFixedPriceItem", `<Item>${parts.join("")}</Item>`);
 }
 
 function xmlEscape(s: string): string {

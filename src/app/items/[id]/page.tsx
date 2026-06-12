@@ -18,6 +18,180 @@ function StatusDot({ status }: { status: string }) {
   return <span className={`inline-block w-2 h-2 rounded-full ${statusColors[status] || "bg-zinc-400"}`} />;
 }
 
+// 加工済み画像グリッド (ドラッグ&ドロップ並び替え + ←/→ ボタン + 削除)
+function ProcessedImagesGrid({
+  images,
+  itemId,
+  onPreview,
+  onToast,
+  onRefresh,
+}: {
+  images: string[];
+  itemId: string;
+  onPreview: (path: string) => void;
+  onToast: (t: { type: "success" | "error"; text: string } | null) => void;
+  onRefresh: () => Promise<void> | void;
+}) {
+  // 楽観的に並び順を保持 (サーバ確定までUIを即時更新)
+  const [order, setOrder] = useState<string[]>(images);
+  const [dragFrom, setDragFrom] = useState<number | null>(null);
+  const [dragOver, setDragOver] = useState<number | null>(null);
+  const [savingOrder, setSavingOrder] = useState(false);
+  // 外部 (リフェッチ) で配列が変わったら同期。並び替え中は無視。
+  useEffect(() => {
+    if (!savingOrder) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setOrder(images);
+    }
+  }, [images, savingOrder]);
+
+  async function persistOrder(newOrder: string[]) {
+    // newOrder の各要素について、元 images 配列でのインデックスを引いて送る
+    const indexMap = new Map<string, number>();
+    images.forEach((path, i) => indexMap.set(path, i));
+    const orderIndices = newOrder.map((p) => indexMap.get(p));
+    if (orderIndices.some((v) => v == null)) {
+      onToast({ type: "error", text: "並び替えに失敗しました (画像不整合)" });
+      return;
+    }
+    setSavingOrder(true);
+    try {
+      const res = await fetch(`/api/items/${itemId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "reorder_processed_images", order: orderIndices }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        onToast({ type: "error", text: err.error || "並び替えの保存に失敗しました" });
+        // 失敗したら元に戻す
+        setOrder(images);
+      } else {
+        onToast({ type: "success", text: "並び順を保存しました" });
+        await onRefresh();
+      }
+    } catch (e) {
+      onToast({ type: "error", text: `並び替え失敗: ${e instanceof Error ? e.message : String(e)}` });
+      setOrder(images);
+    } finally {
+      setSavingOrder(false);
+    }
+  }
+
+  function move(from: number, to: number) {
+    if (from === to || from < 0 || to < 0 || from >= order.length || to >= order.length) return;
+    const next = order.slice();
+    const [it] = next.splice(from, 1);
+    next.splice(to, 0, it);
+    setOrder(next);
+    persistOrder(next);
+  }
+
+  return (
+    <div className="grid grid-cols-4 gap-1.5 p-2.5">
+      {order.map((path, i) => {
+        const isDragging = dragFrom === i;
+        const isDropTarget = dragOver === i && dragFrom !== null && dragFrom !== i;
+        return (
+          <div
+            key={path}
+            draggable
+            onDragStart={() => setDragFrom(i)}
+            onDragOver={(e) => { e.preventDefault(); if (dragOver !== i) setDragOver(i); }}
+            onDragLeave={() => { if (dragOver === i) setDragOver(null); }}
+            onDrop={(e) => {
+              e.preventDefault();
+              if (dragFrom != null && dragFrom !== i) move(dragFrom, i);
+              setDragFrom(null);
+              setDragOver(null);
+            }}
+            onDragEnd={() => { setDragFrom(null); setDragOver(null); }}
+            className={`relative group aspect-square w-full bg-black rounded-lg overflow-hidden cursor-move transition-all
+              ${isDragging ? "opacity-40 scale-95" : ""}
+              ${isDropTarget ? "ring-2 ring-primary scale-105" : ""}
+            `}
+            title="ドラッグして並び替え"
+          >
+            {/* 1枚目バッジ */}
+            {i === 0 && (
+              <span className="absolute top-1 left-1 z-10 text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/90 text-white shadow-sm">
+                MAIN
+              </span>
+            )}
+            <Image
+              src={path}
+              alt=""
+              fill
+              sizes="(max-width: 640px) 50vw, 25vw"
+              onClick={() => onPreview(path)}
+              className="object-cover cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all pointer-events-auto"
+              draggable={false}
+            />
+            {/* ←/→ 移動ボタン (タッチ/キーボード用フォールバック) */}
+            <div className="absolute inset-x-0 bottom-1 flex justify-between px-1 opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none">
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); move(i, i - 1); }}
+                disabled={i === 0 || savingOrder}
+                aria-label="左に移動"
+                className="w-6 h-6 rounded-full bg-black/70 text-white flex items-center justify-center shadow-md hover:bg-black/90 disabled:opacity-30 disabled:cursor-not-allowed pointer-events-auto"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); move(i, i + 1); }}
+                disabled={i === order.length - 1 || savingOrder}
+                aria-label="右に移動"
+                className="w-6 h-6 rounded-full bg-black/70 text-white flex items-center justify-center shadow-md hover:bg-black/90 disabled:opacity-30 disabled:cursor-not-allowed pointer-events-auto"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                </svg>
+              </button>
+            </div>
+            {/* 削除ボタン */}
+            <button
+              type="button"
+              onClick={async (e) => {
+                e.stopPropagation();
+                if (!confirm(`画像 ${i + 1} を削除します。よろしいですか？\n（切り抜きを再実行すれば作り直せます）`)) return;
+                // 元配列でのインデックスで送る
+                const origIndex = images.indexOf(path);
+                if (origIndex < 0) {
+                  onToast({ type: "error", text: "削除に失敗しました (画像不整合)" });
+                  return;
+                }
+                const res = await fetch(`/api/items/${itemId}`, {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ action: "remove_processed_image", index: origIndex }),
+                });
+                if (res.ok) {
+                  onToast({ type: "success", text: "加工済み画像を削除しました" });
+                  await onRefresh();
+                } else {
+                  const err = await res.json().catch(() => ({}));
+                  onToast({ type: "error", text: err.error || "削除に失敗しました" });
+                }
+              }}
+              title="この画像を削除（切り抜き失敗など）"
+              aria-label={`画像 ${i + 1} を削除`}
+              className="absolute top-1 right-1 w-6 h-6 rounded-full bg-red-600/90 text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center shadow-md hover:bg-red-600 z-10"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // 寸法・重量入力 (制御コンポーネント): 外部からの val 更新を反映しつつ、編集中はローカル draft を保持
 function DimensionInput({ label, val, onSave }: {
   label: string;
@@ -588,45 +762,13 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
               </Button>
             </div>
             {processedImages.length > 0 ? (
-              <div className="grid grid-cols-4 gap-1.5 p-2.5">
-                {processedImages.map((path, i) => (
-                  <div key={i} className="relative group aspect-square w-full bg-black rounded-lg overflow-hidden">
-                    <Image
-                      src={path}
-                      alt=""
-                      fill
-                      sizes="(max-width: 640px) 50vw, 25vw"
-                      onClick={() => setLightboxImage(path)}
-                      className="object-cover cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all"
-                    />
-                    <button
-                      type="button"
-                      onClick={async (e) => {
-                        e.stopPropagation();
-                        if (!confirm(`画像 ${i + 1} を削除します。よろしいですか？\n（切り抜きを再実行すれば作り直せます）`)) return;
-                        const res = await fetch(`/api/items/${item.id}`, {
-                          method: "PATCH",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ action: "remove_processed_image", index: i }),
-                        });
-                        if (res.ok) {
-                          setToast({ type: "success", text: "加工済み画像を削除しました" });
-                          await fetchItem();
-                        } else {
-                          const err = await res.json().catch(() => ({}));
-                          setToast({ type: "error", text: err.error || "削除に失敗しました" });
-                        }
-                      }}
-                      title="この画像を削除（切り抜き失敗など）"
-                      className="absolute top-1 right-1 w-6 h-6 rounded-full bg-red-600/90 text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center shadow-md hover:bg-red-600 z-10"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
-                ))}
-              </div>
+              <ProcessedImagesGrid
+                images={processedImages}
+                itemId={item.id}
+                onPreview={(p) => setLightboxImage(p)}
+                onToast={(t) => setToast(t)}
+                onRefresh={fetchItem}
+              />
             ) : (
               <div className="px-4 py-6 text-center text-xs text-muted-foreground">
                 まだ画像処理されていません
