@@ -2,7 +2,8 @@
 // Usage: node scripts/batch-regenerate-listings.mjs [--retry-generic]
 
 const BASE = process.env.BASE_URL || "http://localhost:3000";
-const DELAY_MS = 4000; // レート制限対策: 4秒間隔
+const DELAY_MS = 2000; // リクエスト間隔
+const FETCH_TIMEOUT_MS = 120000; // thinking model用: 2分タイムアウト
 const retryGeneric = process.argv.includes("--retry-generic");
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
@@ -40,6 +41,7 @@ async function main() {
       const r = await fetch(`${BASE}/api/items/${item.id}/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       });
 
       if (r.ok) {

@@ -3,7 +3,7 @@ import { db, schema } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { getCategory, type KabutoCategory } from "@/lib/kabuto/categories";
 
-const GEMINI_MODEL = "gemini-2.5-flash";
+const GEMINI_MODEL = "gemini-3.1-pro-preview";
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
 const SYSTEM_PROMPT = `You are an expert eBay seller at "kaito_japanese_samurai_store" (100% positive feedback, 38+ sales). You specialize in Japanese samurai armor, helmets, and antiques shipped from Japan.
@@ -101,7 +101,7 @@ async function callGemini(
       contents: [{ parts }],
       generationConfig: {
         temperature: 0.7,
-        maxOutputTokens: 3000,
+        maxOutputTokens: 16000,
         responseMimeType: "application/json",
       },
     }),
