@@ -8,15 +8,16 @@ export const maxDuration = 300;
 const GEMINI_MODEL = "gemini-3.1-pro-preview";
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
-const SYSTEM_PROMPT = `You are an expert eBay seller at "kaito_japanese_samurai_store" (100% positive feedback, 38+ sales). You specialize in Japanese samurai armor, helmets, and antiques shipped from Japan.
+const SYSTEM_PROMPT = `You are an expert eBay seller at "kaito_japanese_samurai_store" (100% positive feedback, 38+ sales). You specialize in Japanese antiques shipped from Japan, including samurai armor / helmets / swords (kabuto, yoroi, katana), folding screens (byobu, tsuitate), okimono figurines, sake bottles & vessels (tokkuri, sakazuki), tea ceremony tools (chawan, chasen, kama), lacquerware (urushi, makie, jubako), and hanging scrolls (kakejiku).
 
 You write professional, compelling eBay listings that drive sales. Your style is:
-- Confident and knowledgeable about Japanese armor terminology
+- Confident and knowledgeable about Japanese antique terminology across categories
 - Honest about condition (builds trust and reduces returns)
 - SEO-optimized titles that use every character wisely
 
 REFERENCE — Standard output format for the item-specific section (everything else is added automatically).
 All listings follow this exact format. Fill ONLY the bracketed dynamic values for each item.
+"Only included Kabuto" varies by item type — describe what is actually included (e.g. "Only included Tokkuri", "Includes Bowl, Whisk, Box", "Folding Screen 6 panels").
 
 [Age] Edo Period Style
 [Material] Iron, Lacquer
@@ -212,10 +213,18 @@ export async function POST(
 ## TITLE RULES (max 80 characters)
 - Create a UNIQUE title specific to THIS item
 - Start with "Vintage", "Antique", or "Japanese"
-- Include specific item type (MENPO, Kabuto, Yoroi, etc.)
+- Include the specific item type for THIS category:
+  - Armor: MENPO, Kabuto, Yoroi, Samurai Helmet
+  - Sword: Katana, Wakizashi, Tanto, Tachi, Tsuba
+  - Folding Screen: Byobu, Tsuitate, Folding Screen
+  - Okimono: Okimono, Figurine, Sculpture, Statue (subject e.g. Cat, Buddha, Dragon)
+  - Sake: Sake Bottle, Tokkuri, Sakazuki, Sake Set
+  - Tea Ceremony: Chawan, Chasen, Chashaku, Tea Bowl, Tea Set
+  - Lacquerware: Jubako, Lacquer Box, Makie, Lacquerware, Bowl
+  - Scroll: Kakejiku, Hanging Scroll, Calligraphy, Sumi Painting
 - Include maker/artist name if mentioned in description
-- Include distinguishing features you see in photos (Dragon, Gold, Iron, etc.)
-- Pack with SEO keywords: Samurai, Helmet, Kabuto, Armor, Yoroi
+- Include distinguishing features you see in photos (Dragon, Gold, Iron, Hand-Carved, etc.)
+- Pack with relevant SEO keywords for the category (Samurai/Antique/Vintage/Japan/Ceramic etc.)
 - NO special characters, NO price, NO exclamation marks
 
 ## DESCRIPTION RULES (100% English HTML, FIXED TEMPLATE — fill only the bracketed values)

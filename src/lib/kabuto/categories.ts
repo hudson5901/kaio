@@ -5,7 +5,9 @@
  * eBay出品時のテンプレート・デフォルト値・Item Specificsを提供する。
  */
 
-export type KabutoCategory = "A" | "B" | "C" | "D" | "E" | "F";
+export type KabutoCategory =
+  | "A" | "B" | "C" | "D" | "E" | "F"
+  | "G" | "H" | "I" | "J" | "K" | "L";
 
 export interface KabutoCategoryDef {
   id: KabutoCategory;
@@ -208,6 +210,180 @@ export const KABUTO_CATEGORIES: Record<KabutoCategory, KabutoCategoryDef> = {
     defaultCondition: "USED_GOOD",
     keywords: [],
     negativeKeywords: [],
+  },
+
+  G: {
+    id: "G",
+    name: "衝立・屏風",
+    nameEn: "Folding Screen / Byobu / Tsuitate",
+    description: "和室用衝立・屏風。装飾画・書・蒔絵などが描かれた木製枠の仕切り。",
+    priceRangeJpy: { min: 5000, max: 200000 },
+    titleTemplate: "Japanese Vintage Folding Screen Byobu Tsuitate Painted Wooden Partition",
+    titleKeywords: [
+      "Japanese", "Vintage", "Antique", "Folding Screen", "Byobu", "Tsuitate",
+      "Painted", "Wooden", "Partition", "Decorative",
+    ],
+    defaultAspects: {
+      Type: ["Folding Screen"],
+      "Primary Material": ["Wood", "Paper"],
+      Color: ["Multicolor"],
+      "Original/Reproduction": ["Original"],
+      "Featured Refinements": ["Byobu, Tsuitate, Folding Screen"],
+      "Region/Country of Origin": ["Japan"],
+      Age: ["Unknown"],
+    },
+    defaultWeightG: 8000,
+    defaultDimensions: { lengthCm: 60, widthCm: 15, heightCm: 90 },
+    promptHints: "This is a Japanese folding screen (byobu) or single-panel partition (tsuitate). Describe the painted scene (landscape, flowers, birds, calligraphy), number of panels, and material (wood, paper, silk).",
+    ebayCategoryId: "20510", // Asian Antiques > Japan > Screens
+    defaultCondition: "USED_GOOD",
+    keywords: ["衝立", "屏風", "ついたて", "びょうぶ", "六曲", "二曲", "蒔絵衝立"],
+    negativeKeywords: ["兜", "鎧", "刀"],
+  },
+
+  H: {
+    id: "H",
+    name: "置物・人形",
+    nameEn: "Okimono Figurine / Statue",
+    description: "彫刻・置物・人形。木彫・象牙風・金属・陶器など素材多様。",
+    priceRangeJpy: { min: 3000, max: 100000 },
+    titleTemplate: "Japanese Vintage Okimono Figurine Hand Carved Sculpture Statue",
+    titleKeywords: [
+      "Japanese", "Vintage", "Antique", "Okimono", "Figurine",
+      "Sculpture", "Statue", "Hand Carved", "Decorative",
+    ],
+    defaultAspects: {
+      Type: ["Statue"],
+      "Primary Material": ["Wood"],
+      Color: ["Brown"],
+      "Original/Reproduction": ["Original"],
+      "Featured Refinements": ["Okimono, Japanese Figurine"],
+      "Region/Country of Origin": ["Japan"],
+      Age: ["Unknown"],
+    },
+    defaultWeightG: 1500,
+    defaultDimensions: { lengthCm: 20, widthCm: 15, heightCm: 25 },
+    promptHints: "This is an okimono (decorative ornament/figurine). Identify the subject (animal, deity, person, mythological creature), carving style, and material. Note any signature (mei) if visible.",
+    ebayCategoryId: "20507", // Asian Antiques > Japan > Other
+    defaultCondition: "USED_GOOD",
+    keywords: ["置物", "おきもの", "彫刻", "木彫", "招き猫", "達磨", "干支", "縁起物"],
+    negativeKeywords: ["兜", "鎧", "刀"],
+  },
+
+  I: {
+    id: "I",
+    name: "日本酒・酒器",
+    nameEn: "Japanese Sake Bottle / Sake Vessel",
+    description: "日本酒の瓶（ヴィンテージ含む）、または陶器の酒器・徳利・盃。",
+    priceRangeJpy: { min: 2000, max: 80000 },
+    titleTemplate: "Japanese Sake Bottle Tokkuri Sakazuki Ceramic Vessel Vintage",
+    titleKeywords: [
+      "Japanese", "Sake", "Bottle", "Tokkuri", "Sakazuki",
+      "Vessel", "Ceramic", "Pottery", "Vintage", "Antique",
+    ],
+    defaultAspects: {
+      Type: ["Sake Set"],
+      "Primary Material": ["Ceramic"],
+      Color: ["Multicolor"],
+      "Original/Reproduction": ["Original"],
+      "Featured Refinements": ["Sake Vessel, Tokkuri"],
+      "Region/Country of Origin": ["Japan"],
+      Age: ["Unknown"],
+    },
+    defaultWeightG: 1000,
+    defaultDimensions: { lengthCm: 15, widthCm: 15, heightCm: 25 },
+    promptHints: "This is either a Japanese sake bottle (collectible/vintage) or a ceramic sake vessel (tokkuri for serving, sakazuki/ochoko for drinking). For bottles, mention brewery, vintage, fill level. For ceramics, mention kiln/region (Bizen, Shigaraki, Imari, Arita), glaze, and condition.",
+    ebayCategoryId: "20505", // Asian Antiques > Japan > Tea & Sake Sets
+    defaultCondition: "USED_GOOD",
+    keywords: ["日本酒", "徳利", "盃", "酒器", "ぐい呑み", "おちょこ", "とっくり", "酒瓶", "古酒"],
+    negativeKeywords: ["兜", "鎧", "刀"],
+  },
+
+  J: {
+    id: "J",
+    name: "茶道具",
+    nameEn: "Tea Ceremony Set / Chanoyu",
+    description: "茶碗・茶釜・茶筅・棗・水差しなど、茶道で使われる道具一式。",
+    priceRangeJpy: { min: 3000, max: 200000 },
+    titleTemplate: "Japanese Tea Ceremony Set Chawan Bowl Chanoyu Matcha Vintage",
+    titleKeywords: [
+      "Japanese", "Tea Ceremony", "Chanoyu", "Chawan", "Matcha",
+      "Bowl", "Set", "Vintage", "Antique", "Pottery",
+    ],
+    defaultAspects: {
+      Type: ["Tea Bowl"],
+      "Primary Material": ["Ceramic"],
+      Color: ["Brown"],
+      "Original/Reproduction": ["Original"],
+      "Featured Refinements": ["Tea Ceremony, Chanoyu, Matcha"],
+      "Region/Country of Origin": ["Japan"],
+      Age: ["Unknown"],
+    },
+    defaultWeightG: 1500,
+    defaultDimensions: { lengthCm: 18, widthCm: 18, heightCm: 12 },
+    promptHints: "This is a tea ceremony (chanoyu / sado) item. Identify the specific type: chawan (bowl), chasen (whisk), chashaku (scoop), natsume (caddy), kama (kettle), mizusashi (water jar). Mention kiln/region (Raku, Hagi, Karatsu, Mino) and any tomobako (signed box).",
+    ebayCategoryId: "20505", // Asian Antiques > Japan > Tea & Sake Sets
+    defaultCondition: "USED_GOOD",
+    keywords: ["茶道", "茶道具", "茶碗", "茶筅", "茶釜", "棗", "水差し", "茶杓", "抹茶碗"],
+    negativeKeywords: ["兜", "鎧", "刀"],
+  },
+
+  K: {
+    id: "K",
+    name: "漆器・蒔絵",
+    nameEn: "Lacquerware / Makie",
+    description: "重箱・椀・盆・箱物などの漆器。蒔絵・螺鈿・金粉装飾を含む。",
+    priceRangeJpy: { min: 3000, max: 150000 },
+    titleTemplate: "Japanese Vintage Lacquerware Makie Jubako Box Bowl Gold Decorated",
+    titleKeywords: [
+      "Japanese", "Vintage", "Antique", "Lacquerware", "Lacquer",
+      "Makie", "Jubako", "Box", "Bowl", "Gold", "Decorated",
+    ],
+    defaultAspects: {
+      Type: ["Lacquerware"],
+      "Primary Material": ["Lacquer", "Wood"],
+      Color: ["Black", "Gold"],
+      "Original/Reproduction": ["Original"],
+      "Featured Refinements": ["Lacquer, Makie, Urushi"],
+      "Region/Country of Origin": ["Japan"],
+      Age: ["Unknown"],
+    },
+    defaultWeightG: 2000,
+    defaultDimensions: { lengthCm: 25, widthCm: 25, heightCm: 20 },
+    promptHints: "This is a lacquerware (urushi) item. Identify form (jubako stacked box, bowl, tray, document box) and decoration technique (makie gold powder painting, raden mother-of-pearl inlay, kinpaku gold leaf).",
+    ebayCategoryId: "20503", // Asian Antiques > Japan > Lacquer
+    defaultCondition: "USED_GOOD",
+    keywords: ["漆器", "重箱", "蒔絵", "螺鈿", "うるし", "漆塗り", "金箔", "蒔絵箱"],
+    negativeKeywords: ["兜", "鎧", "刀"],
+  },
+
+  L: {
+    id: "L",
+    name: "掛軸・書画",
+    nameEn: "Hanging Scroll / Kakejiku",
+    description: "掛軸・書・水墨画・色紙。日本画・書道作品。",
+    priceRangeJpy: { min: 3000, max: 200000 },
+    titleTemplate: "Japanese Vintage Hanging Scroll Kakejiku Painted Calligraphy Sumi",
+    titleKeywords: [
+      "Japanese", "Vintage", "Antique", "Hanging Scroll", "Kakejiku",
+      "Painting", "Calligraphy", "Sumi", "Ink", "Silk",
+    ],
+    defaultAspects: {
+      Type: ["Painting & Scroll"],
+      "Primary Material": ["Paper", "Silk"],
+      Color: ["Multicolor"],
+      "Original/Reproduction": ["Original"],
+      "Featured Refinements": ["Hanging Scroll, Kakejiku"],
+      "Region/Country of Origin": ["Japan"],
+      Age: ["Unknown"],
+    },
+    defaultWeightG: 800,
+    defaultDimensions: { lengthCm: 60, widthCm: 5, heightCm: 5 },
+    promptHints: "This is a Japanese hanging scroll (kakejiku/kakemono). Identify the subject (landscape, bird-and-flower, calligraphy, Buddhist image), artist signature (mei) and seal (in) if visible, mounting style (silk brocade colors), and tomobako (signed wooden box) if present.",
+    ebayCategoryId: "20509", // Asian Antiques > Japan > Paintings & Scrolls
+    defaultCondition: "USED_GOOD",
+    keywords: ["掛軸", "掛け軸", "書画", "水墨画", "日本画", "色紙", "扁額", "軸装"],
+    negativeKeywords: ["兜", "鎧", "刀"],
   },
 };
 

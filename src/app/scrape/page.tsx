@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 const presets = [
+  // 武具・刀剣
   { label: "日本刀", keyword: "日本刀" },
   { label: "刀 居合", keyword: "刀 居合" },
   { label: "脇差", keyword: "脇差" },
@@ -14,6 +15,19 @@ const presets = [
   { label: "兜", keyword: "兜 甲冑" },
   { label: "鎧", keyword: "鎧 甲冑" },
   { label: "鍔", keyword: "鍔 刀装具" },
+  // 美術品・骨董
+  { label: "衝立", keyword: "衝立 アンティーク" },
+  { label: "屏風", keyword: "屏風 古美術" },
+  { label: "置物", keyword: "置物 木彫 アンティーク" },
+  { label: "招き猫", keyword: "招き猫 古い" },
+  { label: "日本酒", keyword: "日本酒 古酒" },
+  { label: "徳利・盃", keyword: "徳利 盃 酒器" },
+  { label: "茶道具", keyword: "茶道具 茶碗" },
+  { label: "茶釜", keyword: "茶釜 茶道" },
+  { label: "漆器", keyword: "漆器 蒔絵" },
+  { label: "重箱", keyword: "重箱 蒔絵" },
+  { label: "掛軸", keyword: "掛軸 古美術" },
+  { label: "書画", keyword: "書画 水墨画" },
 ];
 
 interface PipelineStep {
