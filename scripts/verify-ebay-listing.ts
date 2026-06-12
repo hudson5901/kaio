@@ -76,26 +76,32 @@ async function main() {
     )
     .join("");
 
-  const policiesXml = hasProfiles
-    ? `<SellerProfiles>
-        <SellerShippingProfile><ShippingProfileID>${shipProfile}</ShippingProfileID></SellerShippingProfile>
-        <SellerPaymentProfile><PaymentProfileID>${payProfile}</PaymentProfileID></SellerPaymentProfile>
-        <SellerReturnProfile><ReturnProfileID>${retProfile}</ReturnProfileID></SellerReturnProfile>
-      </SellerProfiles>`
-    : `<ShippingDetails>
+  const profilesParts: string[] = [];
+  if (shipProfile) profilesParts.push(`<SellerShippingProfile><ShippingProfileID>${shipProfile}</ShippingProfileID></SellerShippingProfile>`);
+  if (payProfile) profilesParts.push(`<SellerPaymentProfile><PaymentProfileID>${payProfile}</PaymentProfileID></SellerPaymentProfile>`);
+  if (retProfile) profilesParts.push(`<SellerReturnProfile><ReturnProfileID>${retProfile}</ReturnProfileID></SellerReturnProfile>`);
+  const sellerProfilesXml = profilesParts.length ? `<SellerProfiles>${profilesParts.join("")}</SellerProfiles>` : "";
+
+  const inlineShippingXml = !shipProfile
+    ? `<ShippingDetails>
         <ShippingType>Flat</ShippingType>
         <ShippingServiceOptions>
           <ShippingServicePriority>1</ShippingServicePriority>
           <ShippingService>ExpeditedShippingFromOutsideUS</ShippingService>
           <ShippingServiceCost currencyID="USD">${listing.shippingCostUsd.toFixed(2)}</ShippingServiceCost>
         </ShippingServiceOptions>
-      </ShippingDetails>
-      <ReturnPolicy>
+      </ShippingDetails>` : "";
+
+  const inlineReturnXml = !retProfile
+    ? `<ReturnPolicy>
         <ReturnsAcceptedOption>ReturnsAccepted</ReturnsAcceptedOption>
         <RefundOption>MoneyBack</RefundOption>
         <ReturnsWithinOption>Days_30</ReturnsWithinOption>
         <ShippingCostPaidByOption>Buyer</ShippingCostPaidByOption>
-      </ReturnPolicy>`;
+      </ReturnPolicy>` : "";
+
+  const policiesXml = `${sellerProfilesXml}${inlineShippingXml}${inlineReturnXml}`;
+  void hasProfiles;
 
   const xmlBody = `<Item>
     <Title>${xmlEscape(listing.title.slice(0, 80))}</Title>

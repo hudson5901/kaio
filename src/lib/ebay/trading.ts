@@ -139,7 +139,6 @@ export async function addFixedPriceItem(item: {
   const shipProfile = process.env.EBAY_FULFILLMENT_POLICY_ID;
   const payProfile = process.env.EBAY_PAYMENT_POLICY_ID;
   const retProfile = process.env.EBAY_RETURN_POLICY_ID;
-  const hasProfiles = !!(shipProfile && payProfile && retProfile);
 
   const pictureXml = item.imageUrls
     .slice(0, 24)
@@ -155,26 +154,52 @@ export async function addFixedPriceItem(item: {
     )
     .join("");
 
-  const policiesXml = hasProfiles
-    ? `<SellerProfiles>
-        <SellerShippingProfile><ShippingProfileID>${shipProfile}</ShippingProfileID></SellerShippingProfile>
-        <SellerPaymentProfile><PaymentProfileID>${payProfile}</PaymentProfileID></SellerPaymentProfile>
-        <SellerReturnProfile><ReturnProfileID>${retProfile}</ReturnProfileID></SellerReturnProfile>
-      </SellerProfiles>`
-    : `<ShippingDetails>
+  // Business Policies は個別に設定可能。設定されたものは SellerProfiles で送り、
+  // 設定されてないものはインラインで補完。Payment は eBay Managed Payments 必須
+  // なのでインライン記述は廃止 (PayPal は無効)。
+  const profilesParts: string[] = [];
+  if (shipProfile) {
+    profilesParts.push(
+      `<SellerShippingProfile><ShippingProfileID>${shipProfile}</ShippingProfileID></SellerShippingProfile>`
+    );
+  }
+  if (payProfile) {
+    profilesParts.push(
+      `<SellerPaymentProfile><PaymentProfileID>${payProfile}</PaymentProfileID></SellerPaymentProfile>`
+    );
+  }
+  if (retProfile) {
+    profilesParts.push(
+      `<SellerReturnProfile><ReturnProfileID>${retProfile}</ReturnProfileID></SellerReturnProfile>`
+    );
+  }
+  const sellerProfilesXml = profilesParts.length
+    ? `<SellerProfiles>${profilesParts.join("")}</SellerProfiles>`
+    : "";
+
+  // Shipping Policy が未設定ならインライン送料を送る
+  const inlineShippingXml = !shipProfile
+    ? `<ShippingDetails>
         <ShippingType>Flat</ShippingType>
         <ShippingServiceOptions>
           <ShippingServicePriority>1</ShippingServicePriority>
           <ShippingService>ExpeditedShippingFromOutsideUS</ShippingService>
           <ShippingServiceCost currencyID="USD">${item.shippingCostUsd.toFixed(2)}</ShippingServiceCost>
         </ShippingServiceOptions>
-      </ShippingDetails>
-      <ReturnPolicy>
+      </ShippingDetails>`
+    : "";
+
+  // Return Policy が未設定ならインライン (30日返品)
+  const inlineReturnXml = !retProfile
+    ? `<ReturnPolicy>
         <ReturnsAcceptedOption>ReturnsAccepted</ReturnsAcceptedOption>
         <RefundOption>MoneyBack</RefundOption>
         <ReturnsWithinOption>Days_30</ReturnsWithinOption>
         <ShippingCostPaidByOption>Buyer</ShippingCostPaidByOption>
-      </ReturnPolicy>`;
+      </ReturnPolicy>`
+    : "";
+
+  const policiesXml = `${sellerProfilesXml}${inlineShippingXml}${inlineReturnXml}`;
 
   const xmlBody = `<Item>
     <Title>${xmlEscape(item.title.slice(0, 80))}</Title>
