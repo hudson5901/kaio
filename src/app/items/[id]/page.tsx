@@ -737,9 +737,16 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
                     />
                   </form>
                 ) : (
-                  <span className="text-base font-bold text-primary tabular-nums cursor-pointer hover:underline" onClick={() => { setDraftPrice(String(item.ebayPriceUsd || "")); setEditingPrice(true); }}>
-                    {item.ebayPriceUsd ? `$${item.ebayPriceUsd}` : "未設定"}
-                  </span>
+                  <div className="flex flex-col items-end">
+                    <span className="text-base font-bold text-primary tabular-nums cursor-pointer hover:underline" onClick={() => { setDraftPrice(String(item.ebayPriceUsd || "")); setEditingPrice(true); }}>
+                      {item.ebayPriceUsd ? `$${item.ebayPriceUsd}` : "未設定"}
+                    </span>
+                    {item.ebayPriceUsd != null && item.ebayPriceUsd > 0 && (
+                      <span className="text-[10px] text-muted-foreground/70 tabular-nums">
+                        ¥{Math.round(item.ebayPriceUsd * (costs?.exchangeRate ?? 160)).toLocaleString()}
+                      </span>
+                    )}
+                  </div>
                 )}
               </div>
 
@@ -1188,9 +1195,16 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
                     />
                   </form>
                 ) : (
-                  <span className="text-lg font-bold text-primary tabular-nums cursor-pointer hover:underline" onClick={() => { setDraftPrice(String(item.ebayPriceUsd || "")); setEditingPrice(true); }}>
-                    {item.ebayPriceUsd ? `$${item.ebayPriceUsd}` : "未設定"}
-                  </span>
+                  <div className="flex flex-col">
+                    <span className="text-lg font-bold text-primary tabular-nums cursor-pointer hover:underline" onClick={() => { setDraftPrice(String(item.ebayPriceUsd || "")); setEditingPrice(true); }}>
+                      {item.ebayPriceUsd ? `$${item.ebayPriceUsd}` : "未設定"}
+                    </span>
+                    {item.ebayPriceUsd != null && item.ebayPriceUsd > 0 && (
+                      <span className="text-[10px] text-muted-foreground/70 tabular-nums">
+                        ¥{Math.round(item.ebayPriceUsd * (costs?.exchangeRate ?? 160)).toLocaleString()}
+                      </span>
+                    )}
+                  </div>
                 )}
               </div>
               <div className="h-8 w-px bg-border" />
