@@ -716,7 +716,7 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
                       </span>
                     </div>
                     <div className="flex justify-between text-xs">
-                      <span className="text-muted-foreground">関税 ((eBay売上+送料)の10%)</span>
+                      <span className="text-muted-foreground">関税 ((販売価格+送料)の10%)</span>
                       <span className="tabular-nums text-red-400">
                         {costs?.customsDutyJpy ? `-¥${costs.customsDutyJpy.toLocaleString()}` : item.customsDutyUsd ? `-$${item.customsDutyUsd}` : "-"}
                       </span>

@@ -9,7 +9,7 @@
  *   - eBay手数料     = eBay売上 × ebayFee%                   ← 売上税込で請求、送料は含めない
  *   - 広告費         = eBay売上 × ad%                        ← 売上税込で請求、送料は含めない
  *   - 売上税remit    = price × salesTax                     ← buyer徴収分を州に納付 (パススルー)
- *   - 関税           = (eBay売上 + 送料) × customs%          ← Declared Value (税込) + 送料に対して
+ *   - 関税           = (price + 送料) × customs%             ← 税抜の販売価格 + 送料に対して
  *   - 送料           = FedEx IP テーブル (実重量と容積重量のmax)
  *   - 仕入           = メルカリ価格
  *
@@ -195,14 +195,14 @@ export function calculateCosts(params: {
 
   // --- eBay販売価格 ---
   // 純利益 = price×(1+tax) - price×(1+tax)×(fee+ad) - price×tax
-  //         - (price×(1+tax)+ship)×customs - ship - cost
-  //       = price × [(1+tax)(1-fee-ad-customs) - tax] - ship×(1+customs) - cost
+  //         - (price+ship)×customs - ship - cost
+  //       = price × [(1+tax)(1-fee-ad) - tax - customs] - ship×(1+customs) - cost
   //       = price × k - ship × (1+customs) - cost
-  //         where k = (1+tax)(1-fee-ad-customs) - tax
+  //         where k = (1+tax)(1-fee-ad) - tax - customs
   // 目標: 純利益 = cost × margin
   // → price = (cost×(1+margin) + ship×(1+customs)) / k
   const profitCoefficient =
-    (1 + salesTaxRate) * (1 - ebayFeeRate - adRate - customsRate) - salesTaxRate;
+    (1 + salesTaxRate) * (1 - ebayFeeRate - adRate) - salesTaxRate - customsRate;
 
   let ebayPriceUsd: number;
   if (params.ebayPriceUsd && params.ebayPriceUsd > 0) {
@@ -225,8 +225,8 @@ export function calculateCosts(params: {
   const adCostJpy = grossWithTaxJpy * adRate;
   // 売上税は buyer から受け取った分を州に納付 (実質パススルー)
   const salesTaxJpy = revenueJpy * salesTaxRate;
-  // 関税は (eBay売上 + 送料) を Declared Value (税込) として 10%
-  const customsDutyJpy = (grossWithTaxJpy + shippingCostJpy) * customsRate;
+  // 関税は (販売価格 + 送料) を Declared Value (税抜) として 10%
+  const customsDutyJpy = (revenueJpy + shippingCostJpy) * customsRate;
 
   // --- 純利益（円）---
   // 受領総額 - eBay手数料 - 広告費 - 売上税納付 - 関税 - 送料 - 仕入
