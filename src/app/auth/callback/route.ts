@@ -9,13 +9,25 @@ export async function GET(request: Request) {
   const code = searchParams.get("code");
   const next = searchParams.get("next") ?? "/";
 
+  const ALLOWED_EMAILS = [
+    "kaito20050121kaito@gmail.com",
+    "rinng.nakamura@gmail.com",
+  ];
+
   if (code) {
     const supabase = await createSupabaseServer();
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error && data.user) {
-      // Sync user to our DB
       const email = data.user.email!;
+
+      // メールアドレスのホワイトリストチェック
+      if (!ALLOWED_EMAILS.includes(email.toLowerCase())) {
+        await supabase.auth.signOut();
+        return NextResponse.redirect(`${origin}/login?error=unauthorized`);
+      }
+
+      // Sync user to our DB
       const name =
         data.user.user_metadata?.full_name ||
         data.user.user_metadata?.name ||

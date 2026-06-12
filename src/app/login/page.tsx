@@ -1,11 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createSupabaseBrowser } from "@/lib/supabase/client";
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // URL パラメータからエラーを検出
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("error") === "unauthorized") {
+      setError("このアカウントにはアクセス権限がありません");
+    } else if (params.get("error") === "auth_failed") {
+      setError("認証に失敗しました");
+    }
+  }, []);
 
   async function handleGoogleLogin() {
     setLoading(true);
