@@ -38,6 +38,7 @@ export async function recalculateForItem(item: Item): Promise<RecalcResult> {
     customsRate: settings.customsDutyPercent / 100,
     salesTaxRate: settings.salesTaxPercent / 100,
     profitMargin: settings.profitMarginPercent / 100,
+    shippingDiscountRate: (settings.shippingDiscountPercent ?? 0) / 100,
   };
 
   // 1) 利益率下限 (margin floor) を満たす最低価格を逆算

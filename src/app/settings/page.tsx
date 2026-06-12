@@ -10,6 +10,7 @@ interface AppSettings {
   adPercent: number;
   customsDutyPercent: number;
   salesTaxPercent: number;
+  shippingDiscountPercent: number;
   defaultWeightG: number;
   autoSyncEnabled: boolean;
   autoSyncIntervalMinutes: number;
@@ -160,6 +161,19 @@ export default function SettingsPage() {
                 className="h-9"
                 step="0.1"
               />
+            </div>
+            <div>
+              <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider block mb-1">送料割引率 (%, eLogi等)</label>
+              <Input
+                type="number"
+                value={settings.shippingDiscountPercent ?? 50}
+                onChange={(e) => updateSetting("shippingDiscountPercent", Math.min(Math.max(parseFloat(e.target.value) || 0, 0), 95))}
+                className="h-9"
+                step="1"
+                min={0}
+                max={95}
+              />
+              <p className="text-[10px] text-muted-foreground/70 mt-1">FedEx List Rate に対する割引率。50 = 半額。</p>
             </div>
             <div>
               <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider block mb-1">デフォルト重量 (g)</label>

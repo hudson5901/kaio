@@ -9,6 +9,7 @@ export interface AppSettings {
   adPercent: number;
   customsDutyPercent: number;
   salesTaxPercent: number;
+  shippingDiscountPercent: number;
   defaultWeightG: number;
   autoSyncEnabled: boolean;
   autoSyncIntervalMinutes: number;
@@ -20,6 +21,7 @@ const defaults: AppSettings = {
   adPercent: 5,
   customsDutyPercent: 10,
   salesTaxPercent: 6,
+  shippingDiscountPercent: 50,
   defaultWeightG: 2000,
   autoSyncEnabled: false,
   autoSyncIntervalMinutes: 60,

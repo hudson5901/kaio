@@ -148,6 +148,8 @@ export function calculateCosts(params: {
   profitMargin?: number;
   // 手動送料指定 (USD)。設定すると FedEx テーブルではなくこの値を採用。
   shippingCostUsdOverride?: number | null;
+  // FedEx List Rate に対する割引率 (0.0-1.0)。eLogi 契約レートを模擬。
+  shippingDiscountRate?: number;
 }): CostBreakdown {
   const {
     mercariPriceJpy,
@@ -189,12 +191,16 @@ export function calculateCosts(params: {
   // FedEx は実重量と容積重量の高い方を課金重量とする
   const chargeableWeight = Math.max(actualWeight, volumetricWeight);
 
-  // --- 送料 (FedEx テーブル or 手動上書き) ---
+  // --- 送料 (FedEx テーブル × 割引率 or 手動上書き) ---
   const override = params.shippingCostUsdOverride;
+  const discountRate = Math.min(
+    Math.max(params.shippingDiscountRate ?? 0, 0),
+    0.95
+  );
   const shippingCostJpy =
     override != null && Number.isFinite(override) && override >= 0
       ? override * exchangeRate
-      : calculateFedexShipping(chargeableWeight);
+      : calculateFedexShipping(chargeableWeight) * (1 - discountRate);
   const shippingCostUsd = shippingCostJpy / exchangeRate;
 
   // --- eBay販売価格 ---

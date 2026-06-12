@@ -141,6 +141,7 @@ export async function PATCH(
         customsRate: settings.customsDutyPercent / 100,
         salesTaxRate: settings.salesTaxPercent / 100,
         profitMargin: settings.profitMarginPercent / 100,
+        shippingDiscountRate: (settings.shippingDiscountPercent ?? 0) / 100,
         shippingCostUsdOverride: item.shippingCostUsd ?? undefined,
       });
       await db
@@ -183,6 +184,7 @@ export async function PATCH(
         customsRate: settings.customsDutyPercent / 100,
         salesTaxRate: settings.salesTaxPercent / 100,
         profitMargin: settings.profitMarginPercent / 100,
+        shippingDiscountRate: (settings.shippingDiscountPercent ?? 0) / 100,
         shippingCostUsdOverride: shippingUsd,
       });
       await db
