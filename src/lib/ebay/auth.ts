@@ -46,8 +46,8 @@ let cachedToken: { accessToken: string; expiresAt: number } | null = null;
  * OAuth認可URLを生成
  */
 export function getAuthorizationUrl(): string {
-  const clientId = process.env.EBAY_CLIENT_ID;
-  const redirectUri = process.env.EBAY_REDIRECT_URI;
+  const clientId = process.env.EBAY_CLIENT_ID?.trim();
+  const redirectUri = process.env.EBAY_REDIRECT_URI?.trim();
 
   if (!clientId || !redirectUri) {
     throw new Error("EBAY_CLIENT_ID and EBAY_REDIRECT_URI must be set");
@@ -71,9 +71,9 @@ export async function exchangeCodeForToken(code: string): Promise<{
   refreshToken: string;
   expiresIn: number;
 }> {
-  const clientId = process.env.EBAY_CLIENT_ID!;
-  const clientSecret = process.env.EBAY_CLIENT_SECRET!;
-  const redirectUri = process.env.EBAY_REDIRECT_URI!;
+  const clientId = process.env.EBAY_CLIENT_ID!.trim();
+  const clientSecret = process.env.EBAY_CLIENT_SECRET!.trim();
+  const redirectUri = process.env.EBAY_REDIRECT_URI!.trim();
 
   const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
 
@@ -113,8 +113,8 @@ export async function exchangeCodeForToken(code: string): Promise<{
  * リフレッシュトークンでアクセストークンを更新
  */
 export async function refreshAccessToken(refreshToken: string): Promise<string> {
-  const clientId = process.env.EBAY_CLIENT_ID!;
-  const clientSecret = process.env.EBAY_CLIENT_SECRET!;
+  const clientId = process.env.EBAY_CLIENT_ID!.trim();
+  const clientSecret = process.env.EBAY_CLIENT_SECRET!.trim();
 
   const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
 

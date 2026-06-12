@@ -40,8 +40,8 @@ function getTokenUrl(): string {
 }
 
 function getCredentials(): { clientId: string; clientSecret: string } {
-  const clientId = process.env.EBAY_CLIENT_ID;
-  const clientSecret = process.env.EBAY_CLIENT_SECRET;
+  const clientId = process.env.EBAY_CLIENT_ID?.trim();
+  const clientSecret = process.env.EBAY_CLIENT_SECRET?.trim();
 
   if (!clientId || !clientSecret) {
     throw new Error(
@@ -104,7 +104,7 @@ export async function getUserToken(): Promise<string> {
     return userTokenCache.accessToken;
   }
 
-  const refreshToken = process.env.EBAY_REFRESH_TOKEN;
+  const refreshToken = process.env.EBAY_REFRESH_TOKEN?.trim();
   if (!refreshToken) {
     throw new Error(
       "eBay user token not configured. Set EBAY_REFRESH_TOKEN or complete OAuth flow at /api/ebay/callback."

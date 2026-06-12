@@ -36,10 +36,10 @@ export async function callTradingApi(
   callName: string,
   xmlBody: string
 ): Promise<Record<string, unknown>> {
-  const appId = process.env.EBAY_APP_ID;
-  const devId = process.env.EBAY_DEV_ID;
-  const certId = process.env.EBAY_CERT_ID;
-  const authToken = process.env.EBAY_AUTH_TOKEN;
+  const appId = process.env.EBAY_APP_ID?.trim();
+  const devId = process.env.EBAY_DEV_ID?.trim();
+  const certId = process.env.EBAY_CERT_ID?.trim();
+  const authToken = process.env.EBAY_AUTH_TOKEN?.trim();
 
   if (!appId || !devId || !certId || !authToken) {
     throw new Error(
@@ -366,10 +366,10 @@ function xmlEscape(s: string): string {
  */
 export function isTradingApiConfigured(): boolean {
   return !!(
-    process.env.EBAY_APP_ID &&
-    process.env.EBAY_DEV_ID &&
-    process.env.EBAY_CERT_ID &&
-    process.env.EBAY_AUTH_TOKEN
+    process.env.EBAY_APP_ID?.trim() &&
+    process.env.EBAY_DEV_ID?.trim() &&
+    process.env.EBAY_CERT_ID?.trim() &&
+    process.env.EBAY_AUTH_TOKEN?.trim()
   );
 }
 
