@@ -10,25 +10,14 @@
  */
 
 import { NextResponse } from "next/server";
-import { db, schema } from "@/lib/db";
-import { eq } from "drizzle-orm";
-import { cookies } from "next/headers";
+import { getCurrentUser } from "@/lib/auth/current-user";
 
 export const maxDuration = 60;
 
 async function requireAdmin(): Promise<{ ok: true } | { ok: false; reason: string; status: number }> {
   try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get("session")?.value;
-    if (!token) return { ok: false, reason: "未ログイン", status: 401 };
-    const session = await db.query.sessions.findFirst({
-      where: eq(schema.sessions.token, token),
-    });
-    if (!session) return { ok: false, reason: "セッション無効", status: 401 };
-    const user = await db.query.users.findFirst({
-      where: eq(schema.users.id, session.userId),
-    });
-    if (!user) return { ok: false, reason: "ユーザー不在", status: 401 };
+    const user = await getCurrentUser();
+    if (!user) return { ok: false, reason: "未ログイン", status: 401 };
     if (user.role !== "admin") return { ok: false, reason: "admin 限定", status: 403 };
     return { ok: true };
   } catch (e) {
