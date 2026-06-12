@@ -55,6 +55,7 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
   const [editingTitle, setEditingTitle] = useState(false);
   const [editingDesc, setEditingDesc] = useState(false);
   const [editingPrice, setEditingPrice] = useState(false);
+  const [savingPrice, setSavingPrice] = useState(false);
   const [draftTitle, setDraftTitle] = useState("");
   const [draftDesc, setDraftDesc] = useState("");
   const [draftPrice, setDraftPrice] = useState("");
@@ -176,6 +177,41 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
   async function fetchItem() {
     const res = await fetch(`/api/items/${id}`);
     if (res.ok) setItem(await res.json());
+  }
+
+  // 価格保存: form submit / input blur のどちらからも呼ばれる
+  async function savePrice() {
+    if (savingPrice || !item) return;
+    const val = parseFloat(draftPrice);
+    // 無効値 or 変更なし → 編集モードだけ閉じる
+    if (isNaN(val) || val <= 0 || val === item.ebayPriceUsd) {
+      setEditingPrice(false);
+      return;
+    }
+    setSavingPrice(true);
+    try {
+      const oldPrice = item.ebayPriceUsd;
+      await fetch(`/api/items/${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ebayPriceUsd: val }),
+      });
+      await fetch(`/api/items/${item.id}/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: `eBay販売価格を $${oldPrice || 0} → $${val} に変更しました` }),
+      });
+      const costRes = await fetch(`/api/items/${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "calculate_costs" }),
+      });
+      if (costRes.ok) setCosts(await costRes.json());
+      setEditingPrice(false);
+      await fetchItem();
+    } finally {
+      setSavingPrice(false);
+    }
   }
 
   // 判定の楽観的更新 + 自動次へ
@@ -646,23 +682,17 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
               <div className="flex items-center justify-between">
                 <span className="text-xs text-muted-foreground">eBay販売価格</span>
                 {editingPrice ? (
-                  <form onSubmit={async (e) => {
-                    e.preventDefault();
-                    const val = parseFloat(draftPrice);
-                    if (isNaN(val) || val <= 0) return;
-                    const oldPrice = item.ebayPriceUsd;
-                    // 価格更新
-                    await fetch(`/api/items/${item.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ebayPriceUsd: val }) });
-                    // コメントにログ
-                    await fetch(`/api/items/${item.id}/comments`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ content: `eBay販売価格を $${oldPrice || 0} → $${val} に変更しました` }) });
-                    // 費用再計算
-                    const costRes = await fetch(`/api/items/${item.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "calculate_costs" }) });
-                    if (costRes.ok) setCosts(await costRes.json());
-                    setEditingPrice(false);
-                    await fetchItem();
-                  }} className="flex items-center gap-1">
+                  <form onSubmit={(e) => { e.preventDefault(); savePrice(); }} className="flex items-center gap-1">
                     <span className="text-base font-bold text-primary">$</span>
-                    <input autoFocus className="w-20 text-base font-bold text-primary tabular-nums bg-transparent border-b border-primary outline-none text-right" value={draftPrice} onChange={e => setDraftPrice(e.target.value)} onBlur={() => setEditingPrice(false)} onKeyDown={e => e.key === "Escape" && setEditingPrice(false)} />
+                    <input
+                      autoFocus
+                      className="w-20 text-base font-bold text-primary tabular-nums bg-transparent border-b border-primary outline-none text-right disabled:opacity-50"
+                      value={draftPrice}
+                      disabled={savingPrice}
+                      onChange={e => setDraftPrice(e.target.value)}
+                      onBlur={() => savePrice()}
+                      onKeyDown={e => { if (e.key === "Escape") { e.preventDefault(); setEditingPrice(false); } }}
+                    />
                   </form>
                 ) : (
                   <span className="text-base font-bold text-primary tabular-nums cursor-pointer hover:underline" onClick={() => { setDraftPrice(String(item.ebayPriceUsd || "")); setEditingPrice(true); }}>
@@ -946,11 +976,11 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
           {/* Actions - better visual weight */}
           <div className="space-y-2 pt-1">
             {item.ebayStatus === "draft" && (
-              <Button className="w-full gap-2 h-10 text-sm font-semibold shadow-sm shadow-primary/20" onClick={() => handleAction("list_on_ebay", { publish: false })} disabled={actionLoading === "list_on_ebay"}>
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487 18.549 2.799a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" /></svg>
-                {actionLoading === "list_on_ebay"
-                  ? (item.ebayOfferId ? "更新中..." : "下書き作成中...")
-                  : (item.ebayOfferId ? "eBay下書きを更新" : "eBayに下書き出品")}
+              <Button className="w-full gap-2 h-10 text-sm font-semibold shadow-sm shadow-primary/20" onClick={() => {
+                if (confirm(`eBay に即時公開します。\nタイトル: ${item.ebayTitle?.slice(0, 60)}\n価格: $${item.ebayPriceUsd}\n\n続行しますか？`)) handleAction("list_on_ebay");
+              }} disabled={actionLoading === "list_on_ebay"}>
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3" /></svg>
+                {actionLoading === "list_on_ebay" ? "出品中..." : "eBayに即時出品"}
               </Button>
             )}
             {item.ebayStatus === "listed" && (
@@ -1095,20 +1125,17 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
               <div>
                 <span className="text-[10px] text-muted-foreground uppercase tracking-wider block">eBay価格</span>
                 {editingPrice ? (
-                  <form onSubmit={async (e) => {
-                    e.preventDefault();
-                    const val = parseFloat(draftPrice);
-                    if (isNaN(val) || val <= 0) return;
-                    const oldPrice = item.ebayPriceUsd;
-                    await fetch(`/api/items/${item.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ebayPriceUsd: val }) });
-                    await fetch(`/api/items/${item.id}/comments`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ content: `eBay販売価格を $${oldPrice || 0} → $${val} に変更しました` }) });
-                    const costRes = await fetch(`/api/items/${item.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "calculate_costs" }) });
-                    if (costRes.ok) setCosts(await costRes.json());
-                    setEditingPrice(false);
-                    await fetchItem();
-                  }} className="flex items-center gap-1">
+                  <form onSubmit={(e) => { e.preventDefault(); savePrice(); }} className="flex items-center gap-1">
                     <span className="text-lg font-bold text-primary">$</span>
-                    <input autoFocus className="w-20 text-lg font-bold text-primary tabular-nums bg-transparent border-b border-primary outline-none" value={draftPrice} onChange={e => setDraftPrice(e.target.value)} onBlur={() => setEditingPrice(false)} onKeyDown={e => e.key === "Escape" && setEditingPrice(false)} />
+                    <input
+                      autoFocus
+                      className="w-20 text-lg font-bold text-primary tabular-nums bg-transparent border-b border-primary outline-none disabled:opacity-50"
+                      value={draftPrice}
+                      disabled={savingPrice}
+                      onChange={e => setDraftPrice(e.target.value)}
+                      onBlur={() => savePrice()}
+                      onKeyDown={e => { if (e.key === "Escape") { e.preventDefault(); setEditingPrice(false); } }}
+                    />
                   </form>
                 ) : (
                   <span className="text-lg font-bold text-primary tabular-nums cursor-pointer hover:underline" onClick={() => { setDraftPrice(String(item.ebayPriceUsd || "")); setEditingPrice(true); }}>
@@ -1134,11 +1161,11 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
                 {actionLoading === "calculate_costs" ? "計算中..." : "再計算"}
               </Button>
               {item.ebayStatus === "draft" && (
-                <Button className="gap-2 h-10 text-sm font-semibold shadow-sm shadow-primary/20 px-6" onClick={() => handleAction("list_on_ebay", { publish: false })} disabled={actionLoading === "list_on_ebay"}>
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487 18.549 2.799a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" /></svg>
-                  {actionLoading === "list_on_ebay"
-                    ? (item.ebayOfferId ? "更新中..." : "下書き作成中...")
-                    : (item.ebayOfferId ? "eBay下書きを更新" : "eBayに下書き出品")}
+                <Button className="gap-2 h-10 text-sm font-semibold shadow-sm shadow-primary/20 px-6" onClick={() => {
+                  if (confirm(`eBay に即時公開します。\nタイトル: ${item.ebayTitle?.slice(0, 60)}\n価格: $${item.ebayPriceUsd}\n\n続行しますか？`)) handleAction("list_on_ebay");
+                }} disabled={actionLoading === "list_on_ebay"}>
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3" /></svg>
+                  {actionLoading === "list_on_ebay" ? "出品中..." : "eBayに即時出品"}
                 </Button>
               )}
               {item.ebayStatus === "listed" && (

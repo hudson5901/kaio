@@ -249,10 +249,42 @@ export async function PATCH(
 
     case "list_on_ebay": {
       try {
-        const { createEbayListing } = await import("@/lib/ebay/inventory");
-        const publish = body.publish !== false;
-        const result = await createEbayListing(item, { publish });
-        return NextResponse.json(result);
+        const { addFixedPriceItem, isTradingApiConfigured } = await import("@/lib/ebay/trading");
+        const { mapItemToEbayListing } = await import("@/lib/ebay/mapping");
+
+        if (!isTradingApiConfigured()) {
+          return NextResponse.json(
+            {
+              error: "eBay Trading API が未設定",
+              message: "EBAY_APP_ID/DEV_ID/CERT_ID/AUTH_TOKEN を設定してください",
+            },
+            { status: 503 }
+          );
+        }
+
+        const listing = mapItemToEbayListing(item);
+        const { itemId } = await addFixedPriceItem({
+          title: listing.title,
+          description: listing.description,
+          categoryId: listing.categoryId,
+          conditionId: listing.conditionId,
+          priceUsd: listing.priceUsd,
+          shippingCostUsd: listing.shippingCostUsd,
+          imageUrls: listing.imageUrls,
+          aspects: listing.aspects,
+          sku: listing.sku,
+        });
+
+        await db
+          .update(schema.items)
+          .set({
+            ebayListingId: itemId,
+            ebayStatus: "listed",
+            updatedAt: new Date().toISOString(),
+          })
+          .where(eq(schema.items.id, id));
+
+        return NextResponse.json({ listingId: itemId, offerId: null, published: true });
       } catch (err) {
         console.error(`[list_on_ebay] item=${id} failed:`, err);
         const message = err instanceof Error ? err.message : String(err);

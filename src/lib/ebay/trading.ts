@@ -104,6 +104,114 @@ export async function callTradingApi(
 }
 
 /**
+ * AddFixedPriceItem で実出品 (Trading API)
+ * 既存の EBAY_AUTH_TOKEN で動く（OAuth セットアップ不要）。
+ * Business Policies (Shipping/Payment/Return Profile ID) を環境変数で渡せば
+ * SellerProfiles を使用、空ならインライン ShippingDetails/ReturnPolicy で出品。
+ */
+export async function addFixedPriceItem(item: {
+  title: string;
+  description: string;
+  categoryId: string;
+  conditionId: number;
+  priceUsd: number;
+  shippingCostUsd: number;
+  imageUrls: string[];
+  aspects: Record<string, string[]>;
+  sku: string;
+}): Promise<{ itemId: string }> {
+  if (!item.imageUrls.length) {
+    throw new Error("画像URLが空です。加工済み画像をアップロードしてください。");
+  }
+  if (!item.priceUsd || item.priceUsd <= 0) {
+    throw new Error("eBay販売価格が未設定です。");
+  }
+
+  const shipProfile = process.env.EBAY_FULFILLMENT_POLICY_ID;
+  const payProfile = process.env.EBAY_PAYMENT_POLICY_ID;
+  const retProfile = process.env.EBAY_RETURN_POLICY_ID;
+  const hasProfiles = !!(shipProfile && payProfile && retProfile);
+
+  const pictureXml = item.imageUrls
+    .slice(0, 24)
+    .map((u) => `<PictureURL>${xmlEscape(u)}</PictureURL>`)
+    .join("");
+
+  const aspectXml = Object.entries(item.aspects)
+    .flatMap(([name, values]) =>
+      values.map(
+        (v) =>
+          `<NameValueList><Name>${xmlEscape(name)}</Name><Value>${xmlEscape(String(v))}</Value></NameValueList>`
+      )
+    )
+    .join("");
+
+  const policiesXml = hasProfiles
+    ? `<SellerProfiles>
+        <SellerShippingProfile><ShippingProfileID>${shipProfile}</ShippingProfileID></SellerShippingProfile>
+        <SellerPaymentProfile><PaymentProfileID>${payProfile}</PaymentProfileID></SellerPaymentProfile>
+        <SellerReturnProfile><ReturnProfileID>${retProfile}</ReturnProfileID></SellerReturnProfile>
+      </SellerProfiles>`
+    : `<ShippingDetails>
+        <ShippingType>Flat</ShippingType>
+        <ShippingServiceOptions>
+          <ShippingServicePriority>1</ShippingServicePriority>
+          <ShippingService>FedExInternationalPriority</ShippingService>
+          <ShippingServiceCost currencyID="USD">${item.shippingCostUsd.toFixed(2)}</ShippingServiceCost>
+        </ShippingServiceOptions>
+        <InternationalShippingServiceOption>
+          <ShippingServicePriority>1</ShippingServicePriority>
+          <ShippingService>FedExInternationalPriority</ShippingService>
+          <ShippingServiceCost currencyID="USD">${item.shippingCostUsd.toFixed(2)}</ShippingServiceCost>
+          <ShipToLocation>Worldwide</ShipToLocation>
+        </InternationalShippingServiceOption>
+      </ShippingDetails>
+      <ReturnPolicy>
+        <ReturnsAcceptedOption>ReturnsAccepted</ReturnsAcceptedOption>
+        <RefundOption>MoneyBack</RefundOption>
+        <ReturnsWithinOption>Days_30</ReturnsWithinOption>
+        <ShippingCostPaidByOption>Buyer</ShippingCostPaidByOption>
+      </ReturnPolicy>
+      <PaymentMethods>PayPal</PaymentMethods>`;
+
+  const xmlBody = `<Item>
+    <Title>${xmlEscape(item.title.slice(0, 80))}</Title>
+    <Description><![CDATA[${item.description}]]></Description>
+    <PrimaryCategory><CategoryID>${item.categoryId}</CategoryID></PrimaryCategory>
+    <StartPrice currencyID="USD">${item.priceUsd.toFixed(2)}</StartPrice>
+    <ConditionID>${item.conditionId}</ConditionID>
+    <Country>JP</Country>
+    <Location>Japan</Location>
+    <Currency>USD</Currency>
+    <ListingDuration>GTC</ListingDuration>
+    <ListingType>FixedPriceItem</ListingType>
+    <Quantity>1</Quantity>
+    <Site>US</Site>
+    <SKU>${xmlEscape(item.sku)}</SKU>
+    <DispatchTimeMax>5</DispatchTimeMax>
+    <PictureDetails>${pictureXml}</PictureDetails>
+    ${aspectXml ? `<ItemSpecifics>${aspectXml}</ItemSpecifics>` : ""}
+    ${policiesXml}
+  </Item>`;
+
+  const res = await callTradingApi("AddFixedPriceItem", xmlBody);
+  const itemId = String(res.ItemID ?? "");
+  if (!itemId) {
+    throw new Error(`AddFixedPriceItem: ItemID returned empty. Response: ${JSON.stringify(res).slice(0, 500)}`);
+  }
+  return { itemId };
+}
+
+function xmlEscape(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+/**
  * Trading API が設定済みかチェック
  */
 export function isTradingApiConfigured(): boolean {
