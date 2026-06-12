@@ -8,6 +8,7 @@ export interface AppSettings {
   ebayFeePercent: number;
   adPercent: number;
   customsDutyPercent: number;
+  salesTaxPercent: number;
   defaultWeightG: number;
   autoSyncEnabled: boolean;
   autoSyncIntervalMinutes: number;
@@ -18,6 +19,7 @@ const defaults: AppSettings = {
   ebayFeePercent: 16,
   adPercent: 5,
   customsDutyPercent: 10,
+  salesTaxPercent: 6,
   defaultWeightG: 2000,
   autoSyncEnabled: false,
   autoSyncIntervalMinutes: 60,

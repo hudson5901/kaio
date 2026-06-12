@@ -696,8 +696,9 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
                       </span>
                     </div>
                     {[
-                      { label: "eBay手数料 (16%)", usd: costs?.ebayFeeUsd ?? item.ebayFeeUsd, jpy: costs?.ebayFeeJpy },
-                      { label: "広告費 (5%)", usd: costs?.adCostUsd ?? item.adCostUsd, jpy: costs?.adCostJpy },
+                      { label: "eBay手数料 (16%, 売上税込)", usd: costs?.ebayFeeUsd ?? item.ebayFeeUsd, jpy: costs?.ebayFeeJpy },
+                      { label: "広告費 (5%, 売上税込)", usd: costs?.adCostUsd ?? item.adCostUsd, jpy: costs?.adCostJpy },
+                      { label: "売上税納付 (6%)", usd: costs?.salesTaxUsd, jpy: costs?.salesTaxJpy },
                       { label: "関税 (10%)", usd: costs?.customsDutyUsd ?? item.customsDutyUsd, jpy: costs?.customsDutyJpy },
                     ].map(({ label, usd, jpy }) => (
                       <div key={label} className="flex justify-between text-xs">
@@ -714,7 +715,7 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
                         <div className="flex justify-between text-xs">
                           <span className="text-muted-foreground font-medium">経費合計</span>
                           <span className="tabular-nums font-medium text-red-400">
-                            -¥{((item.mercariPrice || 0) + (costs.shippingCostJpy || 0) + (costs.ebayFeeJpy || 0) + (costs.adCostJpy || 0) + (costs.customsDutyJpy || 0)).toLocaleString()}
+                            -¥{((item.mercariPrice || 0) + (costs.shippingCostJpy || 0) + (costs.ebayFeeJpy || 0) + (costs.adCostJpy || 0) + (costs.customsDutyJpy || 0) + (costs.salesTaxJpy || 0)).toLocaleString()}
                           </span>
                         </div>
                       </>

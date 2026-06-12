@@ -121,6 +121,7 @@ export async function PATCH(
         ebayFeeRate: settings.ebayFeePercent / 100,
         adRate: settings.adPercent / 100,
         customsRate: settings.customsDutyPercent / 100,
+        salesTaxRate: settings.salesTaxPercent / 100,
         profitMargin: settings.profitMarginPercent / 100,
       });
 

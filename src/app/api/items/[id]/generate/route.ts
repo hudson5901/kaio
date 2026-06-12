@@ -36,7 +36,7 @@ DESCRIPTION (item-specific part only — Shipping/Notice sections are added auto
 const FOOTER_HTML = `<hr/>
 <h3>Shipping</h3>
 <ul>
-<li>Ships from Japan via EMS (Express Mail Service)</li>
+<li>Ships from Japan via FedEx International Priority</li>
 <li>Estimated delivery: 3-7 business days to USA/Europe</li>
 <li>Carefully packed with protective materials for safe international shipping</li>
 <li>Tracking number provided</li>
@@ -53,7 +53,7 @@ const FOOTER_HTML = `<hr/>
 const FOOTER_HTML_JA = `<hr/>
 <h3>配送</h3>
 <ul>
-<li>日本からEMS（国際スピード郵便）で発送</li>
+<li>日本からFedEx International Priority で発送</li>
 <li>お届け目安：米国・欧州まで3〜7営業日</li>
 <li>国際輸送に耐える保護材で丁寧に梱包</li>
 <li>追跡番号付き</li>

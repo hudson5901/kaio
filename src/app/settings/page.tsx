@@ -9,6 +9,7 @@ interface AppSettings {
   ebayFeePercent: number;
   adPercent: number;
   customsDutyPercent: number;
+  salesTaxPercent: number;
   defaultWeightG: number;
   autoSyncEnabled: boolean;
   autoSyncIntervalMinutes: number;
@@ -142,6 +143,16 @@ export default function SettingsPage() {
                 value={settings.customsDutyPercent}
                 onChange={(e) => updateSetting("customsDutyPercent", parseFloat(e.target.value) || 0)}
                 className="h-9"
+              />
+            </div>
+            <div>
+              <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider block mb-1">売上税率 (%)</label>
+              <Input
+                type="number"
+                value={settings.salesTaxPercent}
+                onChange={(e) => updateSetting("salesTaxPercent", parseFloat(e.target.value) || 0)}
+                className="h-9"
+                step="0.1"
               />
             </div>
             <div>
