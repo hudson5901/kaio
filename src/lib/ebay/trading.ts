@@ -201,6 +201,10 @@ export async function addFixedPriceItem(item: {
 
   const policiesXml = `${sellerProfilesXml}${inlineShippingXml}${inlineReturnXml}`;
 
+  // Best Offer (Allow offers) を全出品で有効化。
+  // buyer が金額提示でき、seller が accept/counter/decline できる。
+  const bestOfferXml = `<BestOfferDetails><BestOfferEnabled>true</BestOfferEnabled></BestOfferDetails>`;
+
   const xmlBody = `<Item>
     <Title>${xmlEscape(item.title.slice(0, 80))}</Title>
     <Description><![CDATA[${item.description}]]></Description>
@@ -218,6 +222,7 @@ export async function addFixedPriceItem(item: {
     <DispatchTimeMax>5</DispatchTimeMax>
     <PictureDetails>${pictureXml}</PictureDetails>
     ${aspectXml ? `<ItemSpecifics>${aspectXml}</ItemSpecifics>` : ""}
+    ${bestOfferXml}
     ${policiesXml}
   </Item>`;
 
