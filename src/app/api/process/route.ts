@@ -3,7 +3,6 @@ import { db, schema } from "@/lib/db";
 import { eq, and, isNull, or, sql } from "drizzle-orm";
 import { getExchangeRate } from "@/lib/exchange-rate";
 import { processItemImages } from "@/lib/image/processor";
-import { calculateCosts } from "@/lib/shipping/calculator";
 import { parseDimensions } from "@/lib/mercari/parser";
 
 export const maxDuration = 300;
@@ -282,30 +281,14 @@ async function batchCalculateCosts(batchSize: number) {
       isNull(schema.items.shippingCostUsd)
     ));
 
+  const { recalculateForItem } = await import("@/lib/shipping/recalc-item");
   const errors: string[] = [];
   let processed = 0;
-  const exchangeRate = await getExchangeRate().catch(() => FALLBACK_USD_TO_JPY);
 
   for (const item of items) {
     try {
-      const costs = calculateCosts({
-        mercariPriceJpy: item.mercariPrice,
-        weightG: item.weightG,
-        lengthCm: item.lengthCm,
-        widthCm: item.widthCm,
-        heightCm: item.heightCm,
-        exchangeRate,
-      });
-
-      await db.update(schema.items).set({
-        shippingCostUsd: costs.shippingCostUsd,
-        customsDutyUsd: costs.customsDutyUsd,
-        ebayFeeUsd: costs.ebayFeeUsd,
-        adCostUsd: costs.adCostUsd,
-        ebayPriceUsd: costs.suggestedPriceUsd,
-        estimatedProfitUsd: costs.profitUsd,
-        updatedAt: new Date().toISOString(),
-      }).where(eq(schema.items.id, item.id));
+      const { update } = await recalculateForItem(item);
+      await db.update(schema.items).set(update).where(eq(schema.items.id, item.id));
       processed++;
     } catch (err) {
       errors.push(`${item.mercariId}: ${err}`);

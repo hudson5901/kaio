@@ -241,7 +241,7 @@ export default function InventoryPage() {
               return (
                 <Link
                   key={item.id}
-                  href={`/items/${item.id}`}
+                  href={`/items/${item.id}?from=inventory`}
                   className="flex items-center gap-3 px-4 py-3 hover:bg-accent/50 transition-colors"
                 >
                   {/* Thumbnail */}
@@ -276,7 +276,7 @@ export default function InventoryPage() {
                   <div className="flex items-center gap-5 flex-shrink-0">
                     <div className="text-right">
                       <p className="text-xs text-muted-foreground">仕入れ</p>
-                      <p className="text-sm tabular-nums">¥{item.mercariPrice.toLocaleString()}</p>
+                      <p className="text-sm tabular-nums">¥{(item.mercariPrice ?? 0).toLocaleString()}</p>
                     </div>
                     <div className="text-right">
                       <p className="text-xs text-muted-foreground">eBay</p>

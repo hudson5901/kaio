@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 import { db, schema } from "@/lib/db";
 import { desc, eq } from "drizzle-orm";
-import { calculateCosts } from "@/lib/shipping/calculator";
-import { getExchangeRate } from "@/lib/exchange-rate";
 
 export const maxDuration = 300;
 
@@ -84,30 +82,15 @@ export async function POST(request: Request) {
   }
 
   if (action === "recalculate_costs") {
-    const exchangeRate = await getExchangeRate().catch(() => 155);
+    const { recalculateForItem } = await import("@/lib/shipping/recalc-item");
     const items = await db.select().from(schema.items);
     let updated = 0;
+    let exchangeRate = 155;
 
     for (const item of items) {
-      const costs = calculateCosts({
-        mercariPriceJpy: item.mercariPrice,
-        ebayPriceUsd: item.ebayPriceUsd,
-        weightG: item.weightG,
-        lengthCm: item.lengthCm,
-        widthCm: item.widthCm,
-        heightCm: item.heightCm,
-        exchangeRate,
-      });
-
-      await db.update(schema.items).set({
-        shippingCostUsd: costs.shippingCostUsd,
-        customsDutyUsd: costs.customsDutyUsd,
-        ebayFeeUsd: costs.ebayFeeUsd,
-        adCostUsd: costs.adCostUsd,
-        ebayPriceUsd: item.ebayPriceUsd || costs.suggestedPriceUsd,
-        estimatedProfitUsd: costs.profitUsd,
-        updatedAt: new Date().toISOString(),
-      }).where(eq(schema.items.id, item.id));
+      const { costs, update } = await recalculateForItem(item);
+      exchangeRate = costs.exchangeRate;
+      await db.update(schema.items).set(update).where(eq(schema.items.id, item.id));
       updated++;
     }
 

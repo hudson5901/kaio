@@ -17,6 +17,7 @@
  */
 
 import { getExchangeRate } from "@/lib/exchange-rate";
+import { getCategory } from "@/lib/kabuto/categories";
 
 const DEFAULT_EXCHANGE_RATE = 155;
 
@@ -163,11 +164,8 @@ export function calculateCosts(params: {
   // --- 重量 (カテゴリ別デフォルトを使用) ---
   let categoryDefaultWeight = DEFAULT_WEIGHT_G;
   if (params.kabutoCategory) {
-    try {
-      const { getCategory } = require("@/lib/kabuto/categories");
-      const cat = getCategory(params.kabutoCategory);
-      if (cat) categoryDefaultWeight = cat.defaultWeightG;
-    } catch { /* ignore */ }
+    const cat = getCategory(params.kabutoCategory as Parameters<typeof getCategory>[0]);
+    if (cat) categoryDefaultWeight = cat.defaultWeightG;
   }
   const actualWeight = weightG || categoryDefaultWeight;
 

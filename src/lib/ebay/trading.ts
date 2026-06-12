@@ -195,6 +195,17 @@ export async function addFixedPriceItem(item: {
   return { itemId };
 }
 
+/**
+ * EndFixedPriceItem で出品取り下げ (Trading API)
+ * AddFixedPriceItem 経由で出品したアイテム (ebayListingId = ItemID) を終了する。
+ */
+export async function endFixedPriceItem(itemId: string): Promise<void> {
+  await callTradingApi(
+    "EndFixedPriceItem",
+    `<ItemID>${itemId}</ItemID><EndingReason>NotAvailable</EndingReason>`
+  );
+}
+
 function xmlEscape(s: string): string {
   return s
     .replace(/&/g, "&amp;")

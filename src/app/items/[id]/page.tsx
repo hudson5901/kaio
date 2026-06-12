@@ -44,8 +44,16 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
   const searchParams = useSearchParams();
   const from = searchParams.get("from");
   const tab = searchParams.get("tab");
-  const backHref = from === "ebay-listing" ? "/ebay-listing" : "/items";
-  const backLabel = from === "ebay-listing" ? "eBay出品" : "アイテム管理";
+  const backHref =
+    from === "ebay-listing" ? "/ebay-listing"
+    : from === "inventory" ? "/inventory"
+    : from === "notifications" ? "/notifications"
+    : "/items";
+  const backLabel =
+    from === "ebay-listing" ? "eBay出品"
+    : from === "inventory" ? "在庫管理"
+    : from === "notifications" ? "通知"
+    : "アイテム管理";
   const [item, setItem] = useState<Item | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [costs, setCosts] = useState<Record<string, number> | null>(null);
@@ -217,17 +225,28 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
   // 判定の楽観的更新 + 自動次へ
   function handleDecision(value: string) {
     if (!item) return;
+    const prevDecision = item.decision;
     const newDecision = item.decision === value ? null : value;
 
-    // 即座にUI更新
+    // 楽観的にUI更新
     setItem({ ...item, decision: newDecision } as Item);
 
-    // バックグラウンドでサーバー同期
+    // バックグラウンドでサーバー同期。失敗時はロールバック。
     fetch(`/api/items/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "update", decision: newDecision }),
-    }).catch(() => {/* 失敗してもUI即反映済み、次回開いた時に再同期 */});
+    })
+      .then((res) => {
+        if (!res.ok) {
+          setItem({ ...item, decision: prevDecision } as Item);
+          showItemToast("error", "判定の更新に失敗しました");
+        }
+      })
+      .catch(() => {
+        setItem({ ...item, decision: prevDecision } as Item);
+        showItemToast("error", "判定の更新に失敗しました");
+      });
 
     // 判定を設定した場合のみ、短い遅延後に次のアイテムへ自動遷移
     if (newDecision && adjacentItems.next) {
@@ -272,14 +291,22 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
   }
 
   async function saveListingText(field: "ebayTitle" | "ebayDescription", value: string) {
-    await fetch(`/api/items/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "update", [field]: value }),
-    });
-    await fetchItem();
-    if (field === "ebayTitle") setEditingTitle(false);
-    else setEditingDesc(false);
+    try {
+      const res = await fetch(`/api/items/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "update", [field]: value }),
+      });
+      if (!res.ok) {
+        showItemToast("error", "保存に失敗しました");
+        return;
+      }
+      await fetchItem();
+      if (field === "ebayTitle") setEditingTitle(false);
+      else setEditingDesc(false);
+    } catch {
+      showItemToast("error", "保存に失敗しました（ネットワークエラー）");
+    }
   }
 
   function showItemToast(type: "success" | "error", text: string) {
@@ -668,7 +695,7 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
                   </span>
                   {item.estimatedProfitUsd != null && (
                     <span className={`text-[11px] tabular-nums ${item.estimatedProfitUsd > 0 ? "text-emerald-400/60" : item.estimatedProfitUsd < 0 ? "text-red-400/60" : "text-muted-foreground/60"}`}>
-                      ¥{Math.round(item.estimatedProfitUsd * 160).toLocaleString()}
+                      ¥{Math.round(item.estimatedProfitUsd * (costs?.exchangeRate ?? 160)).toLocaleString()}
                     </span>
                   )}
                 </div>

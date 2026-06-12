@@ -136,7 +136,8 @@ function isProductImage(url: string): boolean {
   return false;
 }
 
-interface MercariItemDetails extends Partial<MercariItem> {
+export interface MercariItemDetails extends Omit<Partial<MercariItem>, "status"> {
+  status?: "available" | "sold" | "deleted";
   imageUrls: string[];
   category?: string;
   condition?: string;
@@ -148,10 +149,16 @@ interface MercariItemDetails extends Partial<MercariItem> {
 
 /**
  * 個別商品ページの詳細を取得（ベストエフォート）
+ * ページが削除済みの場合は status="deleted" のみ返す
  */
-async function fetchItemDetails(mercariId: string, usdToJpy: number): Promise<MercariItemDetails> {
+export async function fetchItemDetails(mercariId: string, usdToJpy: number = FALLBACK_USD_TO_JPY): Promise<MercariItemDetails> {
   const url = `https://jp.mercari.com/item/${mercariId}`;
   const markdown = await fetchWithJina(url, "[data-testid=description]");
+
+  // 削除チェック（ページ自体が存在しない）
+  if (markdown.includes("この商品は存在しません") || markdown.includes("ページが見つかりません")) {
+    return { imageUrls: [], status: "deleted" };
+  }
 
   // 画像URLを抽出（商品画像のみ、最大10枚）
   const imageUrls: string[] = [];

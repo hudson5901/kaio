@@ -59,8 +59,16 @@ export default function ItemsPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkLoading, setBulkLoading] = useState<string | null>(null);
   const [confirmBulk, setConfirmBulk] = useState<{ action: string; ids: string[]; message: string } | null>(null);
+  const [exchangeRate, setExchangeRate] = useState<number>(160);
 
   useEffect(() => { fetchItems(); }, []);
+
+  useEffect(() => {
+    fetch("/api/exchange-rate")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d?.rate) setExchangeRate(d.rate); })
+      .catch(() => { /* fallback 160 */ });
+  }, []);
 
   // 検索デバウンス
   useEffect(() => {
@@ -278,7 +286,7 @@ export default function ItemsPage() {
               <SelectItem value="draft">下書き</SelectItem>
               <SelectItem value="listed">出品中</SelectItem>
               <SelectItem value="sold">販売済み</SelectItem>
-              <SelectItem value="removed">削除済み</SelectItem>
+              <SelectItem value="removed">取り下げ</SelectItem>
             </SelectContent>
           </Select>
 
@@ -432,7 +440,7 @@ export default function ItemsPage() {
                           利益 ${item.estimatedProfitUsd.toFixed(0)}
                         </span>
                         <span className={`text-[11px] tabular-nums ${item.estimatedProfitUsd > 0 ? "text-emerald-500/60" : "text-red-400/60"}`}>
-                          (¥{Math.round(item.estimatedProfitUsd * 160).toLocaleString()})
+                          (¥{Math.round(item.estimatedProfitUsd * exchangeRate).toLocaleString()})
                         </span>
                       </div>
                     )}
@@ -530,7 +538,7 @@ export default function ItemsPage() {
                     {item.estimatedProfitUsd != null ? (
                       <span className="flex flex-col items-end leading-tight">
                         <span className="text-[13px]">${item.estimatedProfitUsd.toFixed(0)}</span>
-                        <span className="text-[10px] opacity-60">¥{Math.round(item.estimatedProfitUsd * 160).toLocaleString()}</span>
+                        <span className="text-[10px] opacity-60">¥{Math.round(item.estimatedProfitUsd * exchangeRate).toLocaleString()}</span>
                       </span>
                     ) : <span className="text-[13px] text-muted-foreground/30">--</span>}
                   </span>

@@ -520,7 +520,7 @@ export default function Dashboard() {
                     <p className="text-[13px] font-medium truncate">{item.mercariTitle}</p>
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className="text-[12px] text-muted-foreground tabular-nums">
-                        ¥{item.mercariPrice.toLocaleString()}
+                        ¥{(item.mercariPrice ?? 0).toLocaleString()}
                       </span>
                       {item.ebayPriceUsd && (
                         <>

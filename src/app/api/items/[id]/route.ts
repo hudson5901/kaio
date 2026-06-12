@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { db, schema } from "@/lib/db";
 import { eq } from "drizzle-orm";
-import { calculateCostsWithLiveRate } from "@/lib/shipping/calculator";
-import { getSettings } from "@/lib/settings";
+import { recalculateForItem } from "@/lib/shipping/recalc-item";
 import { parseDimensions } from "@/lib/mercari/parser";
 import { getCurrentUser } from "@/lib/auth/current-user";
 
@@ -109,47 +108,8 @@ export async function PATCH(
     }
 
     case "calculate_costs": {
-      const settings = await getSettings();
-      const common = {
-        mercariPriceJpy: item.mercariPrice,
-        weightG: item.weightG,
-        lengthCm: item.lengthCm,
-        widthCm: item.widthCm,
-        heightCm: item.heightCm,
-        kabutoCategory: item.kabutoCategory,
-        ebayFeeRate: settings.ebayFeePercent / 100,
-        adRate: settings.adPercent / 100,
-        customsRate: settings.customsDutyPercent / 100,
-        salesTaxRate: settings.salesTaxPercent / 100,
-        profitMargin: settings.profitMarginPercent / 100,
-      };
-      // マージン下限を満たす底値を逆算し、既存価格と比較して高い方を採用
-      const floor = await calculateCostsWithLiveRate({
-        ...common,
-        ebayPriceUsd: null,
-      });
-      const finalPrice = Math.max(
-        item.ebayPriceUsd ?? 0,
-        floor.suggestedPriceUsd
-      );
-      const costs = await calculateCostsWithLiveRate({
-        ...common,
-        ebayPriceUsd: finalPrice,
-      });
-
-      await db
-        .update(schema.items)
-        .set({
-          shippingCostUsd: costs.shippingCostUsd,
-          customsDutyUsd: costs.customsDutyUsd,
-          ebayFeeUsd: costs.ebayFeeUsd,
-          adCostUsd: costs.adCostUsd,
-          ebayPriceUsd: finalPrice,
-          estimatedProfitUsd: costs.profitUsd,
-          updatedAt: new Date().toISOString(),
-        })
-        .where(eq(schema.items.id, id));
-
+      const { costs, update } = await recalculateForItem(item);
+      await db.update(schema.items).set(update).where(eq(schema.items.id, id));
       return NextResponse.json(costs);
     }
 
@@ -296,9 +256,38 @@ export async function PATCH(
     }
 
     case "remove_from_ebay": {
-      const { removeEbayListing } = await import("@/lib/ebay/inventory");
-      await removeEbayListing(item);
-      return NextResponse.json({ success: true });
+      try {
+        if (item.ebayOfferId) {
+          // Inventory API ルートで出品されたもの
+          const { removeEbayListing } = await import("@/lib/ebay/inventory");
+          await removeEbayListing(item);
+        } else if (item.ebayListingId) {
+          // Trading API ルートで出品されたもの (offerId なし)
+          const { endFixedPriceItem, isTradingApiConfigured } = await import("@/lib/ebay/trading");
+          if (!isTradingApiConfigured()) {
+            return NextResponse.json(
+              { error: "Trading API 未設定" },
+              { status: 503 }
+            );
+          }
+          await endFixedPriceItem(item.ebayListingId);
+          await db
+            .update(schema.items)
+            .set({
+              ebayStatus: "removed",
+              updatedAt: new Date().toISOString(),
+            })
+            .where(eq(schema.items.id, id));
+        }
+        return NextResponse.json({ success: true });
+      } catch (err) {
+        console.error(`[remove_from_ebay] item=${id} failed:`, err);
+        const message = err instanceof Error ? err.message : String(err);
+        return NextResponse.json(
+          { error: "eBay取り下げに失敗しました", message },
+          { status: 500 }
+        );
+      }
     }
 
     case "toggle_staff_check": {

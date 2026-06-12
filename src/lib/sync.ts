@@ -112,7 +112,20 @@ export async function runSyncBatch(batchSize = 20): Promise<SyncResult> {
       // eBay出品中なら取り下げ
       if (status !== "available" && item.ebayStatus === "listed") {
         try {
-          await removeEbayListing(item);
+          if (item.ebayOfferId) {
+            await removeEbayListing(item);
+          } else if (item.ebayListingId) {
+            // Trading API ルート (offerId なし)
+            const { endFixedPriceItem } = await import("@/lib/ebay/trading");
+            await endFixedPriceItem(item.ebayListingId);
+            await db
+              .update(schema.items)
+              .set({
+                ebayStatus: "removed",
+                updatedAt: new Date().toISOString(),
+              })
+              .where(eq(schema.items.id, item.id));
+          }
           results.removedFromEbay++;
         } catch (err) {
           results.errors.push(`eBay取り下げ失敗 ${item.mercariId}: ${err}`);

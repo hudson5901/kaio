@@ -443,11 +443,18 @@ async function upsertTradingItem(
       updates.mercariImages = images;
     }
 
-    // sold ステータスの場合のみ上書き (listed → sold は OK だが sold → listed は防ぐ)
+    // ステータス遷移ルール:
+    //   - listed → sold: OK
+    //   - sold → 何でも: 防ぐ
+    //   - removed → listed: 防ぐ (手動取り下げを尊重)
     if (status === "sold" && existing.ebayStatus !== "sold") {
       updates.ebayStatus = "sold";
       results.soldMarked++;
-    } else if (status === "listed" && existing.ebayStatus !== "sold") {
+    } else if (
+      status === "listed" &&
+      existing.ebayStatus !== "sold" &&
+      existing.ebayStatus !== "removed"
+    ) {
       updates.ebayStatus = "listed";
     }
 
@@ -468,6 +475,8 @@ async function upsertTradingItem(
       ebayTitle: item.Title,
       ebayPriceUsd: item.CurrentPrice,
       ebayStatus: status === "sold" ? "sold" : "listed",
+      // eBay 経由インポート分は既に出品済みなので "list" 判定で取り込む
+      // (手動上書きする余地は items 詳細画面から行う)
       decision: "list",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),

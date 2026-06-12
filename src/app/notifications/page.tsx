@@ -160,7 +160,7 @@ export default function NotificationsPage() {
                       {new Date(n.createdAt).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}
                     </span>
                     {n.itemId && (
-                      <Link href={`/items/${n.itemId}`} className="text-[11px] text-primary hover:underline">
+                      <Link href={`/items/${n.itemId}?from=notifications`} className="text-[11px] text-primary hover:underline">
                         アイテムを見る
                       </Link>
                     )}
