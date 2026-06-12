@@ -10,15 +10,7 @@ import type { Item } from "@/lib/db/schema";
 import { CommentsSection } from "@/components/comments-section";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { checkShouldPass, type PassCheckResult } from "@/lib/kabuto/pass-checker";
-
-const statusLabels: Record<string, string> = {
-  available: "在庫あり", sold: "売り切れ", deleted: "削除済み",
-  draft: "下書き", listed: "出品中", removed: "取り下げ",
-};
-const statusColors: Record<string, string> = {
-  available: "bg-emerald-500", sold: "bg-red-400", deleted: "bg-zinc-500",
-  draft: "bg-zinc-400", listed: "bg-blue-400", removed: "bg-zinc-500",
-};
+import { STATUS_LABELS as statusLabels, STATUS_COLORS as statusColors } from "@/lib/format";
 
 function StatusDot({ status }: { status: string }) {
   return <span className={`inline-block w-2 h-2 rounded-full ${statusColors[status] || "bg-zinc-400"}`} />;

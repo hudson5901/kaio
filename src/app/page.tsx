@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import type { Item, Notification } from "@/lib/db/schema";
+import { STATUS_LABELS as statusLabels } from "@/lib/format";
 
 interface Stats {
   total: number;
@@ -68,15 +69,6 @@ function StatusDot({ status }: { status: string }) {
     <span className={`inline-block w-[6px] h-[6px] rounded-full ${colors[status] || "bg-zinc-400"}`} />
   );
 }
-
-const statusLabels: Record<string, string> = {
-  available: "在庫あり",
-  sold: "売り切れ",
-  deleted: "削除済み",
-  draft: "下書き",
-  listed: "出品中",
-  removed: "取り下げ",
-};
 
 export default function Dashboard() {
   const [items, setItems] = useState<Item[]>([]);

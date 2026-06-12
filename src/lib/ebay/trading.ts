@@ -93,11 +93,20 @@ export async function callTradingApi(
   }
 
   if (response.Ack === "Failure") {
-    const errMsg =
-      response.Errors?.ShortMessage ||
-      response.Errors?.LongMessage ||
-      "Unknown error";
-    throw new Error(`Trading API ${callName} error: ${errMsg}`);
+    // Errors が配列のときと単一オブジェクトの両方に対応
+    const errs = Array.isArray(response.Errors)
+      ? (response.Errors as Record<string, unknown>[])
+      : response.Errors
+        ? [response.Errors as Record<string, unknown>]
+        : [];
+    const errMsg = errs
+      .map((e) => `[${e.ErrorCode}] ${e.ShortMessage || e.LongMessage}`)
+      .join("; ") || "Unknown error";
+    const err = new Error(`Trading API ${callName} error: ${errMsg}`);
+    (err as Error & { errorCodes?: number[] }).errorCodes = errs
+      .map((e) => Number(e.ErrorCode))
+      .filter((n) => Number.isFinite(n));
+    throw err;
   }
 
   return response;
@@ -187,7 +196,19 @@ export async function addFixedPriceItem(item: {
     ${policiesXml}
   </Item>`;
 
-  const res = await callTradingApi("AddFixedPriceItem", xmlBody);
+  let res: Record<string, unknown>;
+  try {
+    res = await callTradingApi("AddFixedPriceItem", xmlBody);
+  } catch (err) {
+    // SKU 重複 (21916564) は ReviseFixedPriceItem で既存出品を更新
+    const codes = (err as Error & { errorCodes?: number[] }).errorCodes ?? [];
+    if (codes.includes(21916564)) {
+      throw new Error(
+        `この SKU (${item.sku}) は eBay 上で既に使われています。先に取り下げるか、別の SKU で出品してください。`
+      );
+    }
+    throw err;
+  }
   const itemId = String(res.ItemID ?? "");
   if (!itemId) {
     throw new Error(`AddFixedPriceItem: ItemID returned empty. Response: ${JSON.stringify(res).slice(0, 500)}`);
