@@ -28,6 +28,42 @@ const presets = [
   { label: "重箱", keyword: "重箱 蒔絵" },
   { label: "掛軸", keyword: "掛軸 古美術" },
   { label: "書画", keyword: "書画 水墨画" },
+  // 金工・茶釜・銅器
+  { label: "鉄瓶", keyword: "鉄瓶 南部鉄器" },
+  { label: "銅器", keyword: "銅器 古美術" },
+  // 仏教・宗教美術
+  { label: "仏像", keyword: "仏像 木彫" },
+  { label: "観音", keyword: "観音 仏像" },
+  // 浮世絵
+  { label: "浮世絵", keyword: "浮世絵 木版画" },
+  { label: "錦絵", keyword: "錦絵 アンティーク" },
+  // 日本人形
+  { label: "雛人形", keyword: "雛人形 古い" },
+  { label: "市松人形", keyword: "市松人形 アンティーク" },
+  // 印籠・根付
+  { label: "印籠", keyword: "印籠 アンティーク" },
+  { label: "根付", keyword: "根付 ねつけ" },
+  // 着物
+  { label: "着物", keyword: "着物 アンティーク 正絹" },
+  { label: "帯", keyword: "帯 袋帯 アンティーク" },
+  // 焼物
+  { label: "伊万里", keyword: "伊万里 古伊万里" },
+  { label: "有田焼", keyword: "有田焼 アンティーク" },
+  { label: "九谷焼", keyword: "九谷焼 アンティーク" },
+  { label: "備前焼", keyword: "備前焼 茶碗" },
+  // 香道具
+  { label: "香炉", keyword: "香炉 古美術" },
+  // 家具
+  { label: "箪笥", keyword: "箪笥 アンティーク 和家具" },
+  { label: "船箪笥", keyword: "船箪笥" },
+  // 古銭
+  { label: "古銭", keyword: "古銭 寛永通宝" },
+  { label: "古紙幣", keyword: "古紙幣 アンティーク" },
+  // ガラス
+  { label: "江戸切子", keyword: "江戸切子" },
+  { label: "薩摩切子", keyword: "薩摩切子" },
+  // 文房具
+  { label: "硯", keyword: "硯 書道具" },
 ];
 
 interface PipelineStep {

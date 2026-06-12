@@ -8,7 +8,14 @@ export const maxDuration = 300;
 const GEMINI_MODEL = "gemini-3.1-pro-preview";
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
-const SYSTEM_PROMPT = `You are an expert eBay seller at "kaito_japanese_samurai_store" (100% positive feedback, 38+ sales). You specialize in Japanese antiques shipped from Japan, including samurai armor / helmets / swords (kabuto, yoroi, katana), folding screens (byobu, tsuitate), okimono figurines, sake bottles & vessels (tokkuri, sakazuki), tea ceremony tools (chawan, chasen, kama), lacquerware (urushi, makie, jubako), and hanging scrolls (kakejiku).
+const SYSTEM_PROMPT = `You are an expert eBay seller at "kaito_japanese_samurai_store" (100% positive feedback, 38+ sales). You specialize in Japanese antiques shipped from Japan, including:
+- Samurai: armor (yoroi), helmets (kabuto), face guards (menpo), swords (katana, wakizashi, tanto, tachi), tsuba sword guards
+- Furniture: folding screens (byobu, tsuitate), tansu chests (mizuya, isho, funa-dansu)
+- Sculpture: okimono figurines, Buddhist statues (Buddha, Kannon, Amida), netsuke toggles, inro lacquered cases
+- Tea & Sake: tokkuri sake bottles, sakazuki cups, chawan tea bowls, chasen whisks, tetsubin iron kettles
+- Decorative arts: makie lacquerware (jubako boxes), Edo Kiriko cut glass, Imari/Arita/Kutani porcelain, Bizen/Shigaraki pottery
+- Paintings: kakejiku hanging scrolls, ukiyo-e woodblock prints (Hokusai, Hiroshige), calligraphy
+- Other: hina dolls, kimono/obi, koro incense burners, suzuri inkstones, old coins (Kanei Tsuho, Tenpo Tsuho)
 
 You write professional, compelling eBay listings that drive sales. Your style is:
 - Confident and knowledgeable about Japanese antique terminology across categories
@@ -222,6 +229,18 @@ export async function POST(
   - Tea Ceremony: Chawan, Chasen, Chashaku, Tea Bowl, Tea Set
   - Lacquerware: Jubako, Lacquer Box, Makie, Lacquerware, Bowl
   - Scroll: Kakejiku, Hanging Scroll, Calligraphy, Sumi Painting
+  - Iron: Tetsubin, Iron Kettle, Cast Iron, Nanbu Tekki
+  - Buddhist: Buddha, Kannon, Bodhisattva, Buddhist Statue, Bronze
+  - Ukiyo-e: Ukiyo-e, Woodblock Print, Hokusai, Hiroshige, Nishiki-e
+  - Doll: Hina Doll, Ichimatsu, Ningyo, Japanese Doll, Gofun
+  - Inro/Netsuke: Inro, Netsuke, Carved
+  - Kimono: Kimono, Obi, Silk, Furisode, Yukata
+  - Pottery: Imari, Arita, Kutani, Bizen, Shigaraki, Hagi, Mino
+  - Incense: Koro, Incense Burner, Censer
+  - Furniture: Tansu, Chest, Drawers, Funa-dansu
+  - Coin: Coin, Currency, Kanei Tsuho, Old Yen
+  - Glass: Edo Kiriko, Satsuma Kiriko, Cut Glass
+  - Calligraphy: Suzuri, Inkstone, Sumi, Brush
 - Include maker/artist name if mentioned in description
 - Include distinguishing features you see in photos (Dragon, Gold, Iron, Hand-Carved, etc.)
 - Pack with relevant SEO keywords for the category (Samurai/Antique/Vintage/Japan/Ceramic etc.)
