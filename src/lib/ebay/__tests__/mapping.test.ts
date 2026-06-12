@@ -128,7 +128,27 @@ describe("mapItemToEbayListing", () => {
     const listing = mapItemToEbayListing(makeItem({
       ebayAspects: JSON.stringify(aspects),
     }));
-    expect(listing.aspects).toEqual(aspects);
+    // Type/Color はユーザー指定そのまま、Brand と Country/Region は eBay 必須として自動補完
+    expect(listing.aspects.Type).toEqual(["Yoroi"]);
+    expect(listing.aspects.Color).toEqual(["Red"]);
+    expect(listing.aspects.Brand).toEqual(["Unbranded"]);
+    expect(listing.aspects["Country/Region of Manufacture"]).toEqual(["Japan"]);
+  });
+
+  it("preserves user-specified Brand when present", () => {
+    const aspects = { Type: ["Kabuto"], Brand: ["Vintage Maker"] };
+    const listing = mapItemToEbayListing(makeItem({
+      ebayAspects: JSON.stringify(aspects),
+    }));
+    expect(listing.aspects.Brand).toEqual(["Vintage Maker"]);
+  });
+
+  it("auto-adds Brand=Unbranded for items without aspects", () => {
+    const listing = mapItemToEbayListing(makeItem({
+      ebayAspects: null,
+      kabutoCategory: null,
+    }));
+    expect(listing.aspects.Brand).toEqual(["Unbranded"]);
   });
 
   it("returns priceUsd from item", () => {

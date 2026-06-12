@@ -60,8 +60,19 @@ export function mapItemToEbayListing(item: Item): EbayListingData {
   } else if (item.kabutoCategory) {
     const category = getCategory(item.kabutoCategory as KabutoCategory);
     if (category) {
-      aspects = category.defaultAspects;
+      aspects = { ...category.defaultAspects };
     }
+  }
+
+  // eBay の多くのカテゴリで必須となる aspects を補完。
+  // - Brand: 骨董/アンティーク系は "Unbranded" がスタンダード (eBay error 21919303 対策)
+  // - Country/Region of Manufacture: 既に入っていなければ Japan
+  // 既に値があれば尊重する。
+  if (!aspects.Brand && !aspects.brand) {
+    aspects.Brand = ["Unbranded"];
+  }
+  if (!aspects["Country/Region of Manufacture"] && !aspects["Region/Country of Origin"]) {
+    aspects["Country/Region of Manufacture"] = ["Japan"];
   }
 
   // eBayカテゴリID
