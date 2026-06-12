@@ -110,9 +110,8 @@ export async function PATCH(
 
     case "calculate_costs": {
       const settings = await getSettings();
-      const costs = await calculateCostsWithLiveRate({
+      const common = {
         mercariPriceJpy: item.mercariPrice,
-        ebayPriceUsd: item.ebayPriceUsd,
         weightG: item.weightG,
         lengthCm: item.lengthCm,
         widthCm: item.widthCm,
@@ -123,6 +122,19 @@ export async function PATCH(
         customsRate: settings.customsDutyPercent / 100,
         salesTaxRate: settings.salesTaxPercent / 100,
         profitMargin: settings.profitMarginPercent / 100,
+      };
+      // マージン下限を満たす底値を逆算し、既存価格と比較して高い方を採用
+      const floor = await calculateCostsWithLiveRate({
+        ...common,
+        ebayPriceUsd: null,
+      });
+      const finalPrice = Math.max(
+        item.ebayPriceUsd ?? 0,
+        floor.suggestedPriceUsd
+      );
+      const costs = await calculateCostsWithLiveRate({
+        ...common,
+        ebayPriceUsd: finalPrice,
       });
 
       await db
@@ -132,7 +144,7 @@ export async function PATCH(
           customsDutyUsd: costs.customsDutyUsd,
           ebayFeeUsd: costs.ebayFeeUsd,
           adCostUsd: costs.adCostUsd,
-          ebayPriceUsd: costs.suggestedPriceUsd,
+          ebayPriceUsd: finalPrice,
           estimatedProfitUsd: costs.profitUsd,
           updatedAt: new Date().toISOString(),
         })

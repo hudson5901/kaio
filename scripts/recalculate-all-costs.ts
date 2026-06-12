@@ -55,9 +55,8 @@ async function main() {
       const item = items[idx];
 
       try {
-        const costs = await calculateCostsWithLiveRate({
+        const common = {
           mercariPriceJpy: item.mercariPrice,
-          ebayPriceUsd: item.ebayPriceUsd,
           weightG: item.weightG,
           lengthCm: item.lengthCm,
           widthCm: item.widthCm,
@@ -68,6 +67,22 @@ async function main() {
           customsRate: settings.customsDutyPercent / 100,
           salesTaxRate: settings.salesTaxPercent / 100,
           profitMargin: settings.profitMarginPercent / 100,
+        };
+
+        // 1. マージン下限（仕入 × profitMargin %）を満たす最低価格を逆算
+        const floor = await calculateCostsWithLiveRate({
+          ...common,
+          ebayPriceUsd: null,
+        });
+        // 2. 既存価格 vs フロア価格の高い方を採用 (自動引き上げ)
+        const finalPrice = Math.max(
+          item.ebayPriceUsd ?? 0,
+          floor.suggestedPriceUsd
+        );
+        // 3. 最終価格で正式な breakdown を計算
+        const costs = await calculateCostsWithLiveRate({
+          ...common,
+          ebayPriceUsd: finalPrice,
         });
 
         const prevProfit = item.estimatedProfitUsd ?? 0;
@@ -84,7 +99,7 @@ async function main() {
               customsDutyUsd: costs.customsDutyUsd,
               ebayFeeUsd: costs.ebayFeeUsd,
               adCostUsd: costs.adCostUsd,
-              ebayPriceUsd: item.ebayPriceUsd || costs.suggestedPriceUsd,
+              ebayPriceUsd: finalPrice,
               estimatedProfitUsd: costs.profitUsd,
               updatedAt: new Date().toISOString(),
             })
