@@ -153,9 +153,10 @@ export async function addFixedPriceItem(item: {
     throw new Error("eBay販売価格が未設定です。");
   }
 
-  const shipProfile = process.env.EBAY_FULFILLMENT_POLICY_ID;
-  const payProfile = process.env.EBAY_PAYMENT_POLICY_ID;
-  const retProfile = process.env.EBAY_RETURN_POLICY_ID;
+  // env 値に末尾改行などが混入していると eBay が ID を invalid 扱いするので trim
+  const shipProfile = process.env.EBAY_FULFILLMENT_POLICY_ID?.trim() || undefined;
+  const payProfile = process.env.EBAY_PAYMENT_POLICY_ID?.trim() || undefined;
+  const retProfile = process.env.EBAY_RETURN_POLICY_ID?.trim() || undefined;
 
   const pictureXml = item.imageUrls
     .slice(0, 24)

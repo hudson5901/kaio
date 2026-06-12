@@ -31,7 +31,8 @@ let campaignIdCache: { id: string; expiresAt: number } | null = null;
 const CACHE_TTL_MS = 10 * 60 * 1000; // 10分
 
 function getConfiguredAdRate(): string {
-  const raw = process.env.EBAY_PROMOTED_AD_RATE;
+  // env 末尾改行などを除去
+  const raw = process.env.EBAY_PROMOTED_AD_RATE?.trim();
   if (!raw) return DEFAULT_AD_RATE;
   const n = Number(raw);
   if (!Number.isFinite(n) || n <= 0 || n > 100) return DEFAULT_AD_RATE;
@@ -43,8 +44,8 @@ function getConfiguredAdRate(): string {
  * env で指定があればそれを返し、なければ Active な GENERAL キャンペーンを検出。
  */
 export async function findActiveCampaignId(): Promise<string | null> {
-  // env 優先
-  const fromEnv = process.env.EBAY_PROMOTED_CAMPAIGN_ID;
+  // env 優先 (末尾改行除去)
+  const fromEnv = process.env.EBAY_PROMOTED_CAMPAIGN_ID?.trim();
   if (fromEnv) return fromEnv;
 
   // キャッシュ
