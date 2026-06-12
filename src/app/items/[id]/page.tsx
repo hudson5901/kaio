@@ -114,10 +114,18 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
     handleClassify();
   }, [item?.id, item?.mercariDescription]);
 
-  // キーボードショートカット: 矢印で前後、1/2/3で判定
+  // キーボードショートカット: 矢印で前後、1/2/3で判定、Esc でモーダル閉じる
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.isComposing) return; // IME 入力中は無視
+      // Esc は常に最優先: モーダル/ライトボックスを閉じる
+      if (e.key === "Escape") {
+        if (lightboxImage) { setLightboxImage(null); return; }
+        if (showShortcuts) { setShowShortcuts(false); return; }
+      }
+      // ライトボックス開いてる時はナビ/判定 ショートカットを停止
+      if (lightboxImage || showShortcuts) return;
       if (e.key === "ArrowLeft" && adjacentItems.prev) {
         router.push(`/items/${adjacentItems.prev}${navQuery}`);
       } else if (e.key === "ArrowRight" && adjacentItems.next) {
@@ -134,7 +142,7 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [adjacentItems, router, item, navQuery]);
+  }, [adjacentItems, router, item, navQuery, lightboxImage, showShortcuts]);
 
   async function fetchAdjacentItems() {
     try {
@@ -259,12 +267,14 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
       try { data = raw ? JSON.parse(raw) : {}; } catch { /* not JSON */ }
       if (!res.ok) {
         const msg = String(data.message || data.error || raw || res.statusText);
-        alert(`${action} 失敗 (${res.status})\n\n${msg.slice(0, 800)}`);
+        showItemToast("error", `${action} 失敗 (${res.status}): ${msg.slice(0, 200)}`);
         return;
       }
       if (action === "calculate_costs") setCosts(data as Record<string, number>);
       await fetchItem();
-    } catch (err) { alert(`Error: ${err}`); }
+    } catch (err) {
+      showItemToast("error", `エラー: ${err instanceof Error ? err.message : err}`);
+    }
     finally { setActionLoading(null); }
   }
 
@@ -272,13 +282,18 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
     setGenerating(true);
     try {
       const res = await fetch(`/api/items/${id}/generate`, { method: "POST" });
-      const data = await res.json();
-      if (data.success) {
+      const raw = await res.text();
+      let data: Record<string, unknown> = {};
+      try { data = raw ? JSON.parse(raw) : {}; } catch { /* ignore */ }
+      if (res.ok && data.success) {
         await fetchItem();
+        showItemToast("success", "AI生成が完了しました");
       } else {
-        alert("生成に失敗しました: " + (data.error || "unknown"));
+        showItemToast("error", `生成に失敗: ${String(data.error || res.statusText).slice(0, 200)}`);
       }
-    } catch (err) { alert(`Error: ${err}`); }
+    } catch (err) {
+      showItemToast("error", `エラー: ${err instanceof Error ? err.message : err}`);
+    }
     finally { setGenerating(false); }
   }
 
@@ -337,7 +352,7 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
       const data = await res.json();
       if (data.success) await fetchItem();
       else showItemToast("error", "分類に失敗しました: " + (data.error || "unknown"));
-    } catch (err) { alert(`Error: ${err}`); }
+    } catch (err) { showItemToast("error", `エラー: ${err instanceof Error ? err.message : err}`); }
     finally { setClassifying(false); }
   }
 

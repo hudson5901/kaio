@@ -39,62 +39,65 @@ export default function ScrapePage() {
   const [maxItems, setMaxItems] = useState(100);
   const [autoProcess, setAutoProcess] = useState(true);
   const [state, setState] = useState<PipelineState | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  function ensurePolling() {
+    if (pollRef.current) return; // 既に走ってる
+    pollRef.current = setInterval(async () => {
+      try {
+        const r = await fetch("/api/pipeline");
+        if (!r.ok) return;
+        const d = await r.json();
+        setState(d);
+        if (!d.running && pollRef.current) {
+          clearInterval(pollRef.current);
+          pollRef.current = null;
+        }
+      } catch { /* ignore */ }
+    }, 2000);
+  }
 
   // Poll server state
   useEffect(() => {
     fetchState();
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+    return () => {
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    };
   }, []);
 
   async function fetchState() {
     try {
       const res = await fetch("/api/pipeline");
+      if (!res.ok) return;
       const data = await res.json();
       setState(data);
-
-      // If running, start polling
-      if (data.running && !pollRef.current) {
-        pollRef.current = setInterval(async () => {
-          try {
-            const r = await fetch("/api/pipeline");
-            const d = await r.json();
-            setState(d);
-            if (!d.running && pollRef.current) {
-              clearInterval(pollRef.current);
-              pollRef.current = null;
-            }
-          } catch { /* ignore */ }
-        }, 2000);
-      }
+      if (data.running) ensurePolling();
     } catch { /* ignore */ }
   }
 
   async function startPipeline() {
-    const res = await fetch("/api/pipeline", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "start", keyword, maxItems, autoProcess }),
-    });
-    const data = await res.json();
-    if (data.error) {
-      alert(data.error);
-      return;
-    }
-    // Start polling
-    fetchState();
-    if (!pollRef.current) {
-      pollRef.current = setInterval(async () => {
-        try {
-          const r = await fetch("/api/pipeline");
-          const d = await r.json();
-          setState(d);
-          if (!d.running && pollRef.current) {
-            clearInterval(pollRef.current);
-            pollRef.current = null;
-          }
-        } catch { /* ignore */ }
-      }, 2000);
+    setError(null);
+    try {
+      const res = await fetch("/api/pipeline", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "start", keyword, maxItems, autoProcess }),
+      });
+      const raw = await res.text();
+      let data: Record<string, unknown> = {};
+      try { data = raw ? JSON.parse(raw) : {}; } catch { /* ignore */ }
+      if (!res.ok || data.error) {
+        setError(String(data.error || res.statusText));
+        return;
+      }
+      fetchState();
+      ensurePolling();
+    } catch (err) {
+      setError(`ネットワークエラー: ${err instanceof Error ? err.message : err}`);
     }
   }
 
@@ -108,29 +111,24 @@ export default function ScrapePage() {
   }
 
   async function runStep(stepId: string, stepAction: string) {
-    const res = await fetch("/api/pipeline", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "run_step", stepId, stepAction }),
-    });
-    const data = await res.json();
-    if (data.error) {
-      alert(data.error);
-      return;
-    }
-    fetchState();
-    if (!pollRef.current) {
-      pollRef.current = setInterval(async () => {
-        try {
-          const r = await fetch("/api/pipeline");
-          const d = await r.json();
-          setState(d);
-          if (!d.running && pollRef.current) {
-            clearInterval(pollRef.current);
-            pollRef.current = null;
-          }
-        } catch { /* ignore */ }
-      }, 2000);
+    setError(null);
+    try {
+      const res = await fetch("/api/pipeline", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "run_step", stepId, stepAction }),
+      });
+      const raw = await res.text();
+      let data: Record<string, unknown> = {};
+      try { data = raw ? JSON.parse(raw) : {}; } catch { /* ignore */ }
+      if (!res.ok || data.error) {
+        setError(String(data.error || res.statusText));
+        return;
+      }
+      fetchState();
+      ensurePolling();
+    } catch (err) {
+      setError(`ネットワークエラー: ${err instanceof Error ? err.message : err}`);
     }
   }
 
@@ -155,6 +153,14 @@ export default function ScrapePage() {
           </div>
         )}
       </div>
+
+      {/* Error banner */}
+      {error && (
+        <div className="rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-2 flex items-start justify-between gap-2">
+          <span className="text-xs text-red-400">{error}</span>
+          <button onClick={() => setError(null)} className="text-red-400/60 hover:text-red-400 text-xs shrink-0">×</button>
+        </div>
+      )}
 
       {/* Search Form */}
       <div className="rounded-xl bg-card border border-border p-4 space-y-4">
