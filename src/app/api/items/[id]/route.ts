@@ -332,7 +332,26 @@ export async function PATCH(
           })
           .where(eq(schema.items.id, id));
 
-        return NextResponse.json({ listingId: itemId, offerId: null, published: true });
+        // Promoted Listings General に 5% で自動エンロール (best-effort)
+        // 失敗しても出品自体は成功扱いにする
+        let promoted: { ok: boolean; campaignId?: string; adRate?: string; reason?: string };
+        try {
+          const { addListingToPromotedCampaign } = await import("@/lib/ebay/promoted");
+          promoted = await addListingToPromotedCampaign(itemId);
+          if (!promoted.ok) {
+            console.warn(`[list_on_ebay] item=${id} Promoted Listings 追加失敗:`, promoted.reason);
+          }
+        } catch (e) {
+          promoted = { ok: false, reason: e instanceof Error ? e.message : String(e) };
+          console.warn(`[list_on_ebay] item=${id} Promoted Listings 例外:`, e);
+        }
+
+        return NextResponse.json({
+          listingId: itemId,
+          offerId: null,
+          published: true,
+          promoted,
+        });
       } catch (err) {
         console.error(`[list_on_ebay] item=${id} failed:`, err);
         const message = err instanceof Error ? err.message : String(err);
