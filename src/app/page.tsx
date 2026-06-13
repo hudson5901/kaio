@@ -237,8 +237,8 @@ export default function Dashboard() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">ダッシュボード</h1>
-          <p className="text-[13px] text-muted-foreground mt-1">メルカリ仕入れ → eBay販売のパフォーマンス</p>
+          <h1 className="text-[22px] sm:text-2xl font-semibold tracking-tight">ダッシュボード</h1>
+          <p className="text-[12px] sm:text-[13px] text-muted-foreground mt-1">メルカリ仕入れ → eBay販売のパフォーマンス</p>
         </div>
         <div className="flex items-center gap-2">
           {/* Notification Bell */}
@@ -257,9 +257,9 @@ export default function Dashboard() {
               )}
             </button>
 
-            {/* Notification Panel */}
+            {/* Notification Panel — clamps to viewport on mobile */}
             {showNotifications && (
-              <div className="absolute right-0 top-10 w-96 bg-card border border-border rounded-lg shadow-lg z-50 overflow-hidden">
+              <div className="absolute right-0 top-10 w-[calc(100vw-1.5rem)] sm:w-96 max-w-96 bg-card border border-border rounded-lg shadow-lg z-50 overflow-hidden">
                 <div className="px-4 py-3 border-b border-border flex items-center justify-between">
                   <h3 className="text-[13px] font-semibold">通知</h3>
                   {unreadCount > 0 && (
@@ -385,7 +385,7 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* Pipeline - clean inline flow */}
+      {/* Pipeline - clean inline flow (scrolls horizontally on mobile if 4 stages don't fit) */}
       <div>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-[15px] font-semibold">パイプライン</h2>
@@ -393,15 +393,15 @@ export default function Dashboard() {
             メルカリ → eBay
           </span>
         </div>
-        <div className="flex items-center gap-0">
+        <div className="flex items-center gap-0 overflow-x-auto no-scrollbar -mx-3 px-3 sm:mx-0 sm:px-0">
           {pipelineStages.map((stage, idx) => (
             <Fragment key={stage.label}>
-              <div className="flex-1 text-center py-5 rounded-lg hover:bg-accent/40 transition-colors">
-                <p className={`text-2xl font-semibold tracking-tight ${stage.color}`}>{stage.count}</p>
-                <p className="text-[12px] text-muted-foreground mt-1">{stage.label}</p>
+              <div className="flex-1 min-w-[70px] text-center py-4 sm:py-5 rounded-lg hover:bg-accent/40 transition-colors">
+                <p className={`text-[22px] sm:text-2xl font-semibold tracking-tight tabular-nums ${stage.color}`}>{stage.count}</p>
+                <p className="text-[11px] sm:text-[12px] text-muted-foreground mt-1 whitespace-nowrap">{stage.label}</p>
               </div>
               {idx < pipelineStages.length - 1 && (
-                <div className="flex items-center justify-center px-1">
+                <div className="flex items-center justify-center px-0.5 sm:px-1 shrink-0">
                   <svg className="w-4 h-4 text-border" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
                   </svg>
@@ -412,12 +412,12 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Auto Sync Scheduler */}
-      <div className="flex items-center justify-between py-4 border-t border-border/40">
+      {/* Auto Sync Scheduler — wraps cleanly on mobile */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 py-4 border-t border-border/40">
         <div className="flex items-center gap-3">
           <div className={`w-2 h-2 rounded-full ${scheduler?.active ? "bg-emerald-500" : "bg-zinc-400"}`} />
           <div>
-            <p className="text-[13px] font-medium">自動在庫監視</p>
+            <p className="text-[14px] sm:text-[13px] font-medium">自動在庫監視</p>
             <p className="text-[12px] text-muted-foreground">
               {scheduler?.active
                 ? `${scheduler.intervalMinutes}分間隔で自動チェック中`
@@ -425,7 +425,7 @@ export default function Dashboard() {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           {scheduler?.lastRun && (
             <span className="text-[11px] text-muted-foreground">
               前回: {new Date(scheduler.lastRun).toLocaleTimeString("ja-JP")}
@@ -441,7 +441,7 @@ export default function Dashboard() {
             disabled={syncing || scheduler?.isRunning}
             variant="outline"
             size="sm"
-            className="gap-2 h-8 text-[13px]"
+            className="gap-2 h-9 sm:h-8 text-[13px]"
           >
             {syncing || scheduler?.isRunning ? (
               <>
@@ -510,22 +510,22 @@ export default function Dashboard() {
                 <Link
                   key={item.id}
                   href={`/items/${item.id}`}
-                  className={`flex items-center gap-4 px-4 py-3 hover:bg-accent/50 active:bg-accent/70 transition-colors ${
+                  className={`flex items-center gap-3 sm:gap-4 px-3 sm:px-4 py-3 hover:bg-accent/50 active:bg-accent/70 transition-colors ${
                     index > 0 ? "border-t border-border/40" : ""
                   }`}
                 >
                   {images[0] ? (
-                    <div className="relative w-9 h-9 rounded overflow-hidden flex-shrink-0">
-                      <Image src={images[0]} alt="" fill sizes="36px" className="object-cover" />
+                    <div className="relative w-12 h-12 sm:w-9 sm:h-9 rounded overflow-hidden flex-shrink-0">
+                      <Image src={images[0]} alt="" fill sizes="48px" className="object-cover" />
                     </div>
                   ) : (
-                    <div className="w-9 h-9 rounded bg-accent flex-shrink-0 flex items-center justify-center text-muted-foreground/40">
+                    <div className="w-12 h-12 sm:w-9 sm:h-9 rounded bg-accent flex-shrink-0 flex items-center justify-center text-muted-foreground/40">
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" /></svg>
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-medium truncate">{item.mercariTitle}</p>
-                    <div className="flex items-center gap-2 mt-0.5">
+                    <p className="text-[14px] sm:text-[13px] font-medium truncate">{item.mercariTitle}</p>
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">
                       <span className="text-[12px] text-muted-foreground tabular-nums">
                         ¥{(item.mercariPrice ?? 0).toLocaleString()}
                       </span>
@@ -536,8 +536,21 @@ export default function Dashboard() {
                         </>
                       )}
                     </div>
+                    {/* Mobile-only: status row below price */}
+                    <div className="sm:hidden flex items-center gap-1.5 mt-1 text-[11px] text-muted-foreground">
+                      <span className="inline-flex items-center gap-1">
+                        <StatusDot status={item.mercariStatus} />
+                        {statusLabels[item.mercariStatus]}
+                      </span>
+                      <span className="text-border">·</span>
+                      <span className="inline-flex items-center gap-1">
+                        <StatusDot status={item.ebayStatus} />
+                        {statusLabels[item.ebayStatus]}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                  {/* Desktop status block */}
+                  <div className="hidden sm:flex items-center gap-1.5 flex-shrink-0">
                     <span className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
                       <StatusDot status={item.mercariStatus} />
                       {statusLabels[item.mercariStatus]}

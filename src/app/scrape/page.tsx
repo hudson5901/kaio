@@ -191,11 +191,11 @@ export default function ScrapePage() {
   const hasProgress = steps.some((s) => s.status !== "pending");
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="max-w-2xl mx-auto space-y-5 sm:space-y-6">
       {/* Header */}
       <div className="text-center space-y-1.5 pt-2">
-        <h1 className="text-xl font-bold tracking-tight">スクレイピング</h1>
-        <p className="text-xs text-muted-foreground">
+        <h1 className="text-[22px] sm:text-xl font-bold tracking-tight">スクレイピング</h1>
+        <p className="text-[12px] sm:text-xs text-muted-foreground px-2">
           メルカリから取得 → 詳細情報 → 画像処理 → 費用計算を自動実行
         </p>
         {running && (
@@ -216,18 +216,18 @@ export default function ScrapePage() {
 
       {/* Search Form */}
       <div className="rounded-xl bg-card border border-border p-4 space-y-4">
-        {/* Presets */}
+        {/* Presets — horizontal scroll on mobile so they don't crush */}
         <div>
           <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider block mb-2">
             クイック検索
           </label>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex sm:flex-wrap gap-2 overflow-x-auto sm:overflow-visible no-scrollbar -mx-1 px-1">
             {presets.map((p) => (
               <button
                 key={p.keyword}
                 onClick={() => setKeyword(p.keyword)}
                 disabled={running}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                className={`shrink-0 px-3.5 py-2.5 sm:py-1.5 rounded-lg text-[13px] sm:text-xs font-medium transition-colors whitespace-nowrap ${
                   keyword === p.keyword
                     ? "bg-primary text-primary-foreground"
                     : "bg-accent text-muted-foreground hover:text-foreground"
@@ -239,8 +239,8 @@ export default function ScrapePage() {
           </div>
         </div>
 
-        {/* Keyword + Count */}
-        <div className="grid grid-cols-[1fr_220px] gap-3">
+        {/* Keyword + Count — stack on mobile */}
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr_220px] gap-3">
           <div>
             <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider block mb-2">
               検索キーワード
@@ -249,7 +249,11 @@ export default function ScrapePage() {
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
               placeholder="兜 甲冑"
-              className="h-9"
+              autoCapitalize="off"
+              autoCorrect="off"
+              spellCheck={false}
+              enterKeyHint="search"
+              className="h-11 sm:h-9 text-[15px] sm:text-sm"
               disabled={running}
             />
           </div>
@@ -263,7 +267,7 @@ export default function ScrapePage() {
                   key={n}
                   onClick={() => setMaxItems(n)}
                   disabled={running}
-                  className={`flex-1 py-2 rounded-lg text-xs font-medium transition-colors ${
+                  className={`flex-1 py-3 sm:py-2 rounded-lg text-[13px] sm:text-xs font-medium transition-colors tabular-nums ${
                     maxItems === n
                       ? "bg-primary text-primary-foreground"
                       : "bg-accent text-muted-foreground hover:text-foreground"
@@ -276,21 +280,21 @@ export default function ScrapePage() {
           </div>
         </div>
 
-        {/* Auto-process toggle */}
-        <label className="flex items-center gap-3 cursor-pointer">
+        {/* Auto-process toggle — bigger switch on mobile */}
+        <label className="flex items-center gap-3 cursor-pointer py-1">
           <div
             onClick={() => !running && setAutoProcess(!autoProcess)}
-            className={`relative w-10 h-5 rounded-full transition-colors ${
+            className={`relative w-12 h-7 sm:w-10 sm:h-5 rounded-full transition-colors flex-shrink-0 ${
               autoProcess ? "bg-primary" : "bg-accent"
             }`}
           >
             <div
-              className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
-                autoProcess ? "translate-x-5" : "translate-x-0.5"
+              className={`absolute top-0.5 w-6 h-6 sm:w-4 sm:h-4 rounded-full bg-white transition-transform ${
+                autoProcess ? "translate-x-[22px] sm:translate-x-5" : "translate-x-0.5"
               }`}
             />
           </div>
-          <span className="text-sm text-muted-foreground">
+          <span className="text-[13px] sm:text-sm text-muted-foreground">
             スクレイプ後に自動処理（詳細取得・画像処理・費用計算）
           </span>
         </label>
@@ -300,7 +304,7 @@ export default function ScrapePage() {
           <Button
             onClick={startPipeline}
             disabled={running}
-            className="flex-1 h-10 text-sm gap-2"
+            className="flex-1 h-12 sm:h-10 text-[14px] sm:text-sm font-semibold gap-2"
           >
             {running ? (
               <>

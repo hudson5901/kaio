@@ -10,6 +10,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import type { Item } from "@/lib/db/schema";
 import { CommentsSection } from "@/components/comments-section";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { EbayCategorySelector } from "@/components/ebay-category-selector";
+import { getCategory, type KabutoCategory } from "@/lib/kabuto/categories";
 import { checkShouldPass, type PassCheckResult } from "@/lib/kabuto/pass-checker";
 import { STATUS_LABELS as statusLabels, STATUS_COLORS as statusColors } from "@/lib/format";
 import { sanitizeListingHtml } from "@/lib/sanitize-html";
@@ -88,7 +90,7 @@ function ProcessedImagesGrid({
   }
 
   return (
-    <div className="grid grid-cols-4 gap-1.5 p-2.5">
+    <div className="grid grid-cols-3 lg:grid-cols-4 gap-2 lg:gap-1.5 p-2.5">
       {order.map((path, i) => {
         const isDragging = dragFrom === i;
         const isDropTarget = dragOver === i && dragFrom !== null && dragFrom !== i;
@@ -127,16 +129,17 @@ function ProcessedImagesGrid({
               className="object-cover cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all pointer-events-auto"
               draggable={false}
             />
-            {/* ←/→ 移動ボタン (タッチ/キーボード用フォールバック) */}
-            <div className="absolute inset-x-0 bottom-1 flex justify-between px-1 opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none">
+            {/* ←/→ 移動ボタン (タッチ/キーボード用)
+                モバイルは hover が無いので常時表示。デスクトップは hover で出す。 */}
+            <div className="absolute inset-x-0 bottom-1 flex justify-between px-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity z-10 pointer-events-none">
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); move(i, i - 1); }}
                 disabled={i === 0 || savingOrder}
                 aria-label="左に移動"
-                className="w-6 h-6 rounded-full bg-black/70 text-white flex items-center justify-center shadow-md hover:bg-black/90 disabled:opacity-30 disabled:cursor-not-allowed pointer-events-auto"
+                className="w-9 h-9 lg:w-6 lg:h-6 rounded-full bg-black/75 text-white flex items-center justify-center shadow-md hover:bg-black/90 disabled:opacity-30 disabled:cursor-not-allowed pointer-events-auto"
               >
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <svg className="w-4 h-4 lg:w-3.5 lg:h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
                 </svg>
               </button>
@@ -145,14 +148,14 @@ function ProcessedImagesGrid({
                 onClick={(e) => { e.stopPropagation(); move(i, i + 1); }}
                 disabled={i === order.length - 1 || savingOrder}
                 aria-label="右に移動"
-                className="w-6 h-6 rounded-full bg-black/70 text-white flex items-center justify-center shadow-md hover:bg-black/90 disabled:opacity-30 disabled:cursor-not-allowed pointer-events-auto"
+                className="w-9 h-9 lg:w-6 lg:h-6 rounded-full bg-black/75 text-white flex items-center justify-center shadow-md hover:bg-black/90 disabled:opacity-30 disabled:cursor-not-allowed pointer-events-auto"
               >
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <svg className="w-4 h-4 lg:w-3.5 lg:h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
                 </svg>
               </button>
             </div>
-            {/* 削除ボタン */}
+            {/* 削除ボタン — モバイルは常時表示 */}
             <button
               type="button"
               onClick={async (e) => {
@@ -179,9 +182,9 @@ function ProcessedImagesGrid({
               }}
               title="この画像を削除（切り抜き失敗など）"
               aria-label={`画像 ${i + 1} を削除`}
-              className="absolute top-1 right-1 w-6 h-6 rounded-full bg-red-600/90 text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center shadow-md hover:bg-red-600 z-10"
+              className="absolute top-1 right-1 w-9 h-9 lg:w-6 lg:h-6 rounded-full bg-red-600/90 text-white opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity flex items-center justify-center shadow-md hover:bg-red-600 z-10"
             >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <svg className="w-4 h-4 lg:w-3.5 lg:h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
               </svg>
             </button>
@@ -627,45 +630,47 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
   const allImages = mercariImages.slice(0, 10);
 
   return (
-    <div className="max-w-6xl space-y-4">
-      {/* Breadcrumb + Navigation */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground/70">
-          <Link href={backHref} className="hover:text-foreground transition-colors">{backLabel}</Link>
-          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>
-          <span className="text-muted-foreground truncate max-w-xs">{item.mercariTitle}</span>
+    <div className="w-full max-w-6xl space-y-4 overflow-x-hidden pb-20 lg:pb-0">
+      {/* Breadcrumb + Navigation (mobile: breadcrumb shrinks, nav stays full) */}
+      <div className="flex items-center justify-between gap-2 min-w-0">
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground/70 min-w-0 flex-1">
+          <Link href={backHref} className="hover:text-foreground transition-colors shrink-0">{backLabel}</Link>
+          <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>
+          <span className="text-muted-foreground truncate min-w-0 flex-1">{item.mercariTitle}</span>
         </div>
 
-        {/* Prev/Next navigation */}
-        <div className="flex items-center gap-1.5">
+        {/* Prev/Next navigation — taller on mobile, ? hidden on mobile (no keyboard) */}
+        <div className="flex items-center gap-1.5 shrink-0">
           {adjacentItems.total > 0 && (
-            <span className="text-[11px] text-muted-foreground/50 mr-1 tabular-nums">
+            <span className="hidden sm:inline text-[11px] text-muted-foreground/50 mr-1 tabular-nums">
               {adjacentItems.currentIndex + 1} / {adjacentItems.total}
             </span>
           )}
           <button
             onClick={() => adjacentItems.prev && router.push(`/items/${adjacentItems.prev}${navQuery}`)}
             disabled={!adjacentItems.prev}
-            className="w-8 h-8 rounded-md flex items-center justify-center border border-border/60 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            className="w-10 h-10 lg:w-8 lg:h-8 rounded-md flex items-center justify-center border border-border/60 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
             title="前のアイテム"
+            aria-label="前のアイテム"
           >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <svg className="w-5 h-5 lg:w-4 lg:h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
             </svg>
           </button>
           <button
             onClick={() => adjacentItems.next && router.push(`/items/${adjacentItems.next}${navQuery}`)}
             disabled={!adjacentItems.next}
-            className="w-8 h-8 rounded-md flex items-center justify-center border border-border/60 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            className="w-10 h-10 lg:w-8 lg:h-8 rounded-md flex items-center justify-center border border-border/60 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
             title="次のアイテム"
+            aria-label="次のアイテム"
           >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <svg className="w-5 h-5 lg:w-4 lg:h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
             </svg>
           </button>
           <button
             onClick={() => setShowShortcuts(true)}
-            className="w-8 h-8 rounded-md flex items-center justify-center border border-border/60 text-muted-foreground/50 hover:bg-accent hover:text-foreground transition-colors text-[12px] font-mono"
+            className="hidden lg:flex w-8 h-8 rounded-md items-center justify-center border border-border/60 text-muted-foreground/50 hover:bg-accent hover:text-foreground transition-colors text-[12px] font-mono"
             title="キーボードショートカット"
           >
             ?
@@ -1336,6 +1341,7 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
             { key: "price", ok: item.ebayPriceUsd != null, label: "価格設定" },
             { key: "weight", ok: item.weightG != null, label: "重量" },
             { key: "dimensions", ok: item.lengthCm != null && item.widthCm != null && item.heightCm != null, label: "寸法(L/W/H)" },
+            { key: "category", ok: !!item.ebayCategoryId, label: item.ebayCategoryId ? `カテゴリ (${item.ebayCategoryPath || item.ebayCategoryId})` : "eBayカテゴリ未選択" },
           ] as const;
           let staffChecks: Record<string, Record<string, string>> = {};
           try { staffChecks = item.staffChecks ? JSON.parse(item.staffChecks) : {}; } catch { /* ignore */ }
@@ -1438,6 +1444,25 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
                 </div>
               )}
             </div>
+          );
+        })()}
+
+        {/* eBay カテゴリ選択 */}
+        {(() => {
+          const kabutoDef = item.kabutoCategory
+            ? getCategory(item.kabutoCategory as KabutoCategory)
+            : null;
+          return (
+            <EbayCategorySelector
+              itemId={item.id}
+              seedTitle={item.ebayTitle}
+              seedDescription={item.ebayDescription}
+              currentCategoryId={item.ebayCategoryId}
+              currentCategoryPath={item.ebayCategoryPath}
+              fallbackCategoryId={kabutoDef?.ebayCategoryId ?? null}
+              fallbackLabel={kabutoDef?.name ?? null}
+              onSaved={fetchItem}
+            />
           );
         })()}
 
@@ -1544,6 +1569,68 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
       </div>
       )}
 
+      {/* Mobile sticky action bar — sits above bottom nav (z-30) */}
+      <div className="lg:hidden fixed inset-x-0 bottom-16 z-40 bg-background/95 backdrop-blur-md border-t border-border px-3 py-2 pb-safe">
+        <div className="flex items-center gap-2 max-w-6xl mx-auto">
+          {item.ebayStatus === "draft" && (() => {
+            const missing: string[] = [];
+            if (!item.ebayTitle) missing.push("タイトル");
+            if (!item.ebayDescription) missing.push("説明文");
+            if (item.ebayPriceUsd == null) missing.push("価格");
+            if (item.weightG == null) missing.push("重量");
+            if (item.lengthCm == null || item.widthCm == null || item.heightCm == null) missing.push("寸法");
+            const canList = missing.length === 0 && actionLoading !== "list_on_ebay";
+            return (
+              <Button
+                className="flex-1 h-11 text-[14px] font-semibold gap-1.5 shadow-sm shadow-primary/20"
+                onClick={() => {
+                  if (confirm(`eBay に即時公開します。\nタイトル: ${item.ebayTitle?.slice(0, 60) ?? "(未設定)"}\n価格: ${item.ebayPriceUsd != null ? `$${item.ebayPriceUsd}` : "(未設定)"}\n\n続行しますか？`)) handleAction("list_on_ebay");
+                }}
+                disabled={!canList}
+              >
+                {actionLoading === "list_on_ebay" ? "出品中..." : missing.length ? `要入力: ${missing.length}項目` : "eBayに即時出品"}
+              </Button>
+            );
+          })()}
+          {item.ebayStatus === "listed" && (
+            <Button className="flex-1 h-11 text-[14px] font-semibold" variant="destructive" onClick={() => handleAction("remove_from_ebay")} disabled={actionLoading === "remove_from_ebay"}>
+              {actionLoading === "remove_from_ebay" ? "削除中..." : "eBayから取り下げ"}
+            </Button>
+          )}
+          {item.ebayStatus === "sold" && (
+            <a href={item.mercariUrl} target="_blank" rel="noopener noreferrer" className="flex-1">
+              <Button className="w-full h-11 text-[14px] font-semibold gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm shadow-emerald-600/20">
+                メルカリで購入
+              </Button>
+            </a>
+          )}
+          {/* Mode switcher — quickly toggle judge ↔ ebay view */}
+          <Button
+            variant="outline"
+            className="h-11 px-3 text-[12px] shrink-0"
+            onClick={() => {
+              const next = viewMode === "judge" ? "ebay" : "judge";
+              setViewMode(next);
+              const params = new URLSearchParams(window.location.search);
+              if (next === "ebay") params.set("tab", "ebay"); else params.delete("tab");
+              const qs = params.toString();
+              router.replace(`/items/${id}${qs ? `?${qs}` : ""}`, { scroll: false });
+            }}
+          >
+            {viewMode === "judge" ? "出品" : "判定"}
+          </Button>
+          <button
+            aria-label="アイテムを削除"
+            onClick={() => setConfirmDelete(true)}
+            className="w-11 h-11 rounded-md flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors shrink-0"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
       {/* Lightbox overlay */}
       {lightboxImage && (
         <div
@@ -1551,8 +1638,9 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
           onClick={() => setLightboxImage(null)}
         >
           <button
-            className="absolute top-4 right-4 text-white/70 hover:text-white text-3xl font-light z-10"
+            className="absolute top-3 right-3 w-12 h-12 rounded-full bg-black/50 text-white hover:bg-black/70 flex items-center justify-center text-2xl font-light z-10"
             onClick={() => setLightboxImage(null)}
+            aria-label="閉じる"
           >
             &times;
           </button>

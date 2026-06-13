@@ -114,32 +114,32 @@ export default function InventoryPage() {
   ];
 
   return (
-    <div className="space-y-6 max-w-6xl">
+    <div className="space-y-5 max-w-6xl">
       {/* Header */}
-      <div className="flex items-end justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold tracking-tight">在庫管理</h1>
+          <h1 className="text-[22px] sm:text-xl font-bold tracking-tight">在庫管理</h1>
           <p className="text-xs text-muted-foreground mt-0.5">eBay出品状況の管理</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="grid grid-cols-2 sm:flex items-center gap-2">
           <Button
             variant="outline"
             size="sm"
             onClick={handleEbayImport}
             disabled={importing}
-            className="gap-1.5"
+            className="gap-1.5 h-10 sm:h-8 text-[13px] sm:text-[12px]"
           >
             <svg className={`w-4 h-4 ${importing ? "animate-spin" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
             </svg>
-            {importing ? "インポート中..." : "eBayからインポート"}
+            {importing ? "インポート中..." : "eBayインポート"}
           </Button>
           <Button
             variant="outline"
             size="sm"
             onClick={handleSync}
             disabled={syncing}
-            className="gap-1.5"
+            className="gap-1.5 h-10 sm:h-8 text-[13px] sm:text-[12px]"
           >
             <svg className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" />
@@ -164,19 +164,19 @@ export default function InventoryPage() {
         </div>
       )}
 
-      {/* Stats */}
-      <div className="grid grid-cols-4 gap-3">
+      {/* Stats: 2x2 on mobile, 4 col on desktop */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
         <div className="rounded-xl bg-card border border-border p-3">
           <p className="text-[11px] text-muted-foreground">出品中</p>
-          <p className="text-xl font-bold mt-0.5">{listedCount}</p>
+          <p className="text-[20px] sm:text-xl font-bold mt-0.5 tabular-nums">{listedCount}</p>
         </div>
         <div className="rounded-xl bg-card border border-border p-3">
           <p className="text-[11px] text-muted-foreground">出品額合計</p>
-          <p className="text-xl font-bold mt-0.5 text-primary">${totalListedValue.toFixed(0)}</p>
+          <p className="text-[20px] sm:text-xl font-bold mt-0.5 text-primary tabular-nums">${totalListedValue.toFixed(0)}</p>
         </div>
         <div className="rounded-xl bg-card border border-border p-3">
           <p className="text-[11px] text-muted-foreground">想定利益合計</p>
-          <p className={`text-xl font-bold mt-0.5 ${totalProfit > 0 ? "text-emerald-400" : "text-red-400"}`}>
+          <p className={`text-[20px] sm:text-xl font-bold mt-0.5 tabular-nums ${totalProfit > 0 ? "text-emerald-400" : "text-red-400"}`}>
             ${totalProfit.toFixed(0)}
           </p>
           {pendingCalc > 0 && (
@@ -185,41 +185,42 @@ export default function InventoryPage() {
         </div>
         <div className="rounded-xl bg-card border border-border p-3">
           <p className="text-[11px] text-muted-foreground">販売済み</p>
-          <p className="text-xl font-bold mt-0.5">{soldCount}</p>
+          <p className="text-[20px] sm:text-xl font-bold mt-0.5 tabular-nums">{soldCount}</p>
         </div>
       </div>
 
-      {/* Tabs + Search */}
-      <div className="flex items-center gap-2.5 rounded-xl bg-card border border-border p-2.5">
-        <div className="flex gap-1">
-          {tabs.map((t) => (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                tab === t.key
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
-              }`}
-            >
-              {t.label}
-              <span className="ml-1.5 opacity-60">{t.count}</span>
-            </button>
-          ))}
-        </div>
-        <div className="w-px h-6 bg-border" />
-        <div className="relative flex-1">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
-          </svg>
-          <Input
-            placeholder="検索..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 bg-transparent border-0 shadow-none focus-visible:ring-0"
-          />
-        </div>
-        <span className="text-xs text-muted-foreground tabular-nums">{filtered.length}件</span>
+      {/* Tabs (scroll horizontally on mobile) */}
+      <div className="flex gap-1 overflow-x-auto no-scrollbar -mx-3 px-3 sm:mx-0 sm:px-0 border-b border-border/60 sm:border-b-0">
+        {tabs.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`shrink-0 px-4 py-3 sm:py-1.5 text-[13px] sm:text-xs font-medium transition-colors whitespace-nowrap border-b-2 sm:border-b-0 sm:rounded-lg ${
+              tab === t.key
+                ? "border-primary text-foreground sm:bg-primary sm:text-primary-foreground sm:border-transparent"
+                : "border-transparent text-muted-foreground sm:hover:bg-accent sm:hover:text-foreground"
+            }`}
+          >
+            {t.label}
+            <span className="ml-1.5 opacity-60 tabular-nums">{t.count}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Search */}
+      <div className="relative">
+        <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+        </svg>
+        <Input
+          placeholder="商品名・出品者で検索..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          inputMode="search"
+          enterKeyHint="search"
+          className="pl-10 h-11 sm:h-9"
+        />
+        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[12px] text-muted-foreground tabular-nums pointer-events-none">{filtered.length}件</span>
       </div>
 
       {/* List */}
@@ -257,12 +258,12 @@ export default function InventoryPage() {
                 <Link
                   key={item.id}
                   href={`/items/${item.id}?from=inventory`}
-                  className="flex items-center gap-3 px-4 py-3 hover:bg-accent/50 transition-colors"
+                  className="flex items-start gap-3 px-3 sm:px-4 py-3 hover:bg-accent/50 active:bg-accent/40 transition-colors"
                 >
-                  {/* Thumbnail */}
-                  <div className="relative w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 bg-black">
+                  {/* Thumbnail (bigger on mobile) */}
+                  <div className="relative w-16 h-16 sm:w-12 sm:h-12 rounded-lg overflow-hidden flex-shrink-0 bg-black">
                     {thumb ? (
-                      <Image src={thumb} alt="" fill sizes="48px" className="object-cover" />
+                      <Image src={thumb} alt="" fill sizes="64px" className="object-cover" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-muted-foreground/30">
                         <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}><path strokeLinecap="round" strokeLinejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" /></svg>
@@ -272,8 +273,8 @@ export default function InventoryPage() {
 
                   {/* Info */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <p className="text-sm font-medium truncate">
+                    <div className="flex items-start gap-2 mb-0.5">
+                      <p className="text-[14px] sm:text-sm font-medium leading-snug line-clamp-2 sm:truncate sm:line-clamp-1">
                         {item.ebayTitle || item.mercariTitle}
                       </p>
                       <Badge variant="secondary" className="flex-shrink-0 gap-1 text-[10px]">
@@ -281,14 +282,36 @@ export default function InventoryPage() {
                         {ebayStatusLabels[item.ebayStatus]}
                       </Badge>
                     </div>
-                    <p className="text-xs text-muted-foreground truncate">
+                    <p className="text-[11px] sm:text-xs text-muted-foreground truncate">
                       {item.mercariTitle}
                       {item.mercariSeller && <span className="ml-2">/ {item.mercariSeller}</span>}
                     </p>
+                    {/* MOBILE: 4 metrics in 2x2 compact grid under title */}
+                    <div className="sm:hidden mt-2 grid grid-cols-4 gap-1.5 text-[11px] tabular-nums">
+                      <div>
+                        <div className="text-muted-foreground leading-tight">仕入</div>
+                        <div className="leading-tight">¥{(item.mercariPrice ?? 0).toLocaleString()}</div>
+                      </div>
+                      <div>
+                        <div className="text-muted-foreground leading-tight">eBay</div>
+                        <div className="text-primary font-medium leading-tight">{item.ebayPriceUsd ? `$${item.ebayPriceUsd.toFixed(0)}` : "-"}</div>
+                      </div>
+                      <div>
+                        <div className="text-muted-foreground leading-tight">利益</div>
+                        <div className={`font-medium leading-tight ${
+                          item.estimatedProfitUsd && item.estimatedProfitUsd > 0 ? "text-emerald-400" :
+                          item.estimatedProfitUsd ? "text-red-400" : "text-muted-foreground"
+                        }`}>{item.estimatedProfitUsd != null ? `$${item.estimatedProfitUsd.toFixed(0)}` : "-"}</div>
+                      </div>
+                      <div>
+                        <div className="text-muted-foreground leading-tight">送料</div>
+                        <div className="leading-tight text-muted-foreground">{item.shippingCostUsd ? `$${item.shippingCostUsd.toFixed(0)}` : "-"}</div>
+                      </div>
+                    </div>
                   </div>
 
-                  {/* Prices */}
-                  <div className="flex items-center gap-5 flex-shrink-0">
+                  {/* DESKTOP: Prices */}
+                  <div className="hidden sm:flex items-center gap-5 flex-shrink-0">
                     <div className="text-right">
                       <p className="text-xs text-muted-foreground">仕入れ</p>
                       <p className="text-sm tabular-nums">¥{(item.mercariPrice ?? 0).toLocaleString()}</p>

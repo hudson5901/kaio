@@ -236,9 +236,10 @@ export default function ItemsPage() {
     <div className="space-y-5">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">アイテム管理</h1>
-          <div className="flex items-center gap-4 mt-1">
+        <div className="min-w-0">
+          <h1 className="text-[22px] sm:text-2xl font-semibold tracking-tight">アイテム管理</h1>
+          {/* Stats: large pill-style row on mobile, compact on desktop */}
+          <div className="hidden sm:flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
             <span className="text-[13px] text-muted-foreground">{items.length}件</span>
             <div className="flex items-center gap-3 text-[12px] text-muted-foreground">
               <span>在庫 <span className="text-emerald-500 font-medium">{availableCount}</span></span>
@@ -248,10 +249,28 @@ export default function ItemsPage() {
               <span>下書き <span className="font-medium">{draftCount}</span></span>
             </div>
           </div>
+          <div className="sm:hidden mt-2 grid grid-cols-4 gap-1.5">
+            <div className="rounded-lg border border-border/60 bg-card px-2 py-2 text-center">
+              <div className="text-[10px] text-muted-foreground leading-tight">総数</div>
+              <div className="text-[16px] font-semibold tabular-nums leading-tight mt-0.5">{items.length}</div>
+            </div>
+            <div className="rounded-lg border border-border/60 bg-card px-2 py-2 text-center">
+              <div className="text-[10px] text-muted-foreground leading-tight">在庫</div>
+              <div className="text-[16px] font-semibold tabular-nums leading-tight mt-0.5 text-emerald-500">{availableCount}</div>
+            </div>
+            <div className="rounded-lg border border-border/60 bg-card px-2 py-2 text-center">
+              <div className="text-[10px] text-muted-foreground leading-tight">出品中</div>
+              <div className="text-[16px] font-semibold tabular-nums leading-tight mt-0.5 text-blue-500">{listedCount}</div>
+            </div>
+            <div className="rounded-lg border border-border/60 bg-card px-2 py-2 text-center">
+              <div className="text-[10px] text-muted-foreground leading-tight">下書き</div>
+              <div className="text-[16px] font-semibold tabular-nums leading-tight mt-0.5">{draftCount}</div>
+            </div>
+          </div>
         </div>
-        <Link href="/scrape">
-          <Button size="sm" className="gap-2 text-[13px] h-8">
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <Link href="/scrape" className="sm:self-end">
+          <Button size="sm" className="gap-2 text-[14px] sm:text-[13px] h-11 sm:h-8 w-full sm:w-auto">
+            <svg className="w-4 h-4 sm:w-3.5 sm:h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
             </svg>
             新規取得
@@ -259,8 +278,8 @@ export default function ItemsPage() {
         </Link>
       </div>
 
-      {/* Decision Filter Tabs - Primary Filter */}
-      <div className="flex items-center gap-1 border-b border-border/50 pb-0">
+      {/* Decision Filter Tabs - Primary Filter (mobile: horizontal scroll) */}
+      <div className="flex items-center gap-1 border-b border-border/50 pb-0 overflow-x-auto no-scrollbar -mx-3 px-3 sm:mx-0 sm:px-0">
         {([
           { value: "all", label: "全て", count: items.length },
           { value: "none", label: "未判定", count: items.filter(i => !i.decision).length },
@@ -274,7 +293,7 @@ export default function ItemsPage() {
           <button
             key={value}
             onClick={() => setDecisionFilter(value)}
-            className={`px-3 py-2 text-[13px] font-medium border-b-2 transition-colors -mb-px ${
+            className={`shrink-0 px-3 py-3 sm:py-2 text-[13px] font-medium border-b-2 transition-colors -mb-px whitespace-nowrap ${
               decisionFilter === value
                 ? "border-primary text-foreground"
                 : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
@@ -290,23 +309,44 @@ export default function ItemsPage() {
 
       {/* Filters & Controls - Notion-style toolbar */}
       <div className="flex flex-col gap-2">
-        <div className="flex flex-wrap items-center gap-2 py-2">
-          {/* Search */}
-          <div className="relative flex-1 max-w-xs">
-            <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/50" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
-            </svg>
-            <Input
-              placeholder="検索..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-8 h-8 text-[13px] bg-transparent border-border/50 focus-visible:ring-1 focus-visible:ring-ring/30"
-            />
+        <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2 py-2">
+          {/* Row 1: Search (full width on mobile) + view toggle on right */}
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1 sm:max-w-xs">
+              <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/50" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+              </svg>
+              <Input
+                placeholder="検索..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                inputMode="search"
+                enterKeyHint="search"
+                className="pl-8 h-10 sm:h-8 text-[13px] bg-transparent border-border/50 focus-visible:ring-1 focus-visible:ring-ring/30"
+              />
+            </div>
+            {/* View toggle moves into row 1 on mobile so row 2 can scroll cleanly */}
+            <div className="flex sm:hidden rounded-md border border-border/50 overflow-hidden shrink-0">
+              <button
+                onClick={() => setView("grid")}
+                aria-label="グリッド表示"
+                className={`w-10 h-10 flex items-center justify-center transition-colors ${view === "grid" ? "bg-accent text-foreground" : "text-muted-foreground/50 hover:text-muted-foreground hover:bg-accent/50"}`}
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25a2.25 2.25 0 0 1-2.25-2.25v-2.25Z" /></svg>
+              </button>
+              <button
+                onClick={() => setView("list")}
+                aria-label="リスト表示"
+                className={`w-10 h-10 flex items-center justify-center transition-colors ${view === "list" ? "bg-accent text-foreground" : "text-muted-foreground/50 hover:text-muted-foreground hover:bg-accent/50"}`}
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0ZM3.75 12h.007v.008H3.75V12Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm-.375 5.25h.007v.008H3.75v-.008Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" /></svg>
+              </button>
+            </div>
           </div>
 
           {/* Status Filters */}
           <Select value={mercariFilter} onValueChange={(v) => setMercariFilter(v ?? "all")}>
-            <SelectTrigger className="w-[130px] h-8 text-[12px] border-border/50">
+            <SelectTrigger className="w-full sm:w-[130px] h-10 sm:h-8 text-[13px] sm:text-[12px] border-border/50">
               <SelectValue placeholder="メルカリ" />
             </SelectTrigger>
             <SelectContent>
@@ -317,7 +357,7 @@ export default function ItemsPage() {
             </SelectContent>
           </Select>
           <Select value={ebayFilter} onValueChange={(v) => setEbayFilter(v ?? "all")}>
-            <SelectTrigger className="w-[130px] h-8 text-[12px] border-border/50">
+            <SelectTrigger className="w-full sm:w-[130px] h-10 sm:h-8 text-[13px] sm:text-[12px] border-border/50">
               <SelectValue placeholder="eBay" />
             </SelectTrigger>
             <SelectContent>
@@ -331,7 +371,7 @@ export default function ItemsPage() {
 
           {/* Sort */}
           <Select value={sortKey} onValueChange={(v) => setSortKey(v as SortKey)}>
-            <SelectTrigger className="w-[140px] h-8 text-[12px] border-border/50">
+            <SelectTrigger className="w-full sm:w-[140px] h-10 sm:h-8 text-[13px] sm:text-[12px] border-border/50">
               <SelectValue placeholder="並び替え" />
             </SelectTrigger>
             <SelectContent>
@@ -347,15 +387,15 @@ export default function ItemsPage() {
             </SelectContent>
           </Select>
 
-          <span className="text-[11px] text-muted-foreground/60 tabular-nums whitespace-nowrap ml-1">{filtered.length}件</span>
+          <span className="text-[12px] sm:text-[11px] text-muted-foreground/60 tabular-nums whitespace-nowrap sm:ml-1">{filtered.length}件</span>
 
-          <Button variant="outline" size="sm" className="h-8 gap-1.5 text-[12px]" onClick={() => exportItemsToCSV(filtered)}>
+          <Button variant="outline" size="sm" className="h-10 sm:h-8 gap-1.5 text-[13px] sm:text-[12px] w-full sm:w-auto" onClick={() => exportItemsToCSV(filtered)}>
             <Download className="w-3.5 h-3.5" />
             CSV
           </Button>
 
-          {/* View Toggle */}
-          <div className="flex rounded-md border border-border/50 overflow-hidden ml-auto">
+          {/* View Toggle (desktop only — mobile version lives in row 1) */}
+          <div className="hidden sm:flex rounded-md border border-border/50 overflow-hidden ml-auto">
             <button
               onClick={() => setView("grid")}
               className={`px-2 py-1.5 transition-colors ${view === "grid" ? "bg-accent text-foreground" : "text-muted-foreground/50 hover:text-muted-foreground hover:bg-accent/50"}`}
@@ -371,43 +411,58 @@ export default function ItemsPage() {
           </div>
         </div>
 
-        {/* Bulk Actions Bar */}
+        {/* Bulk Actions Bar
+            Desktop: inline above content (wraps).
+            Mobile: fixed above the bottom navigation (z-40 so it sits above nav at z-30). */}
         {selected.size > 0 && (
-          <div className="flex items-center gap-3 rounded-lg bg-accent/80 px-4 py-2 animate-in slide-in-from-top-2 flex-wrap">
-            <span className="text-[13px] font-medium">{selected.size}件選択中</span>
-            {selected.size < filtered.length && (
-              <button onClick={selectAllFiltered} className="text-[12px] text-primary hover:underline">
-                フィルタ全{filtered.length}件を選択
+          <div
+            className="
+              lg:flex lg:items-center lg:gap-3 lg:rounded-lg lg:bg-accent/80 lg:px-4 lg:py-2 lg:flex-wrap lg:static
+              fixed bottom-16 inset-x-0 z-40 bg-background/95 backdrop-blur-md border-t border-border px-3 py-2 pb-safe
+              animate-in slide-in-from-bottom-2 lg:slide-in-from-top-2
+            "
+          >
+            <div className="flex items-center justify-between gap-2 lg:contents">
+              <span className="text-[13px] font-medium shrink-0">{selected.size}件選択中</span>
+              {selected.size < filtered.length && (
+                <button onClick={selectAllFiltered} className="text-[12px] text-primary hover:underline shrink-0 lg:order-none">
+                  フィルタ全{filtered.length}件を選択
+                </button>
+              )}
+              <button onClick={() => setSelected(new Set())} className="lg:hidden text-[12px] text-muted-foreground hover:text-foreground transition-colors shrink-0">
+                選択解除
               </button>
-            )}
-            <div className="w-px h-4 bg-border" />
-            <Button variant="outline" size="sm" className="h-7 text-[12px]" onClick={() => handleBulkAction("calculate_costs")} disabled={!!bulkLoading}>
-              {bulkLoading === "calculate_costs" ? "計算中..." : "費用計算"}
-            </Button>
-            <Button variant="outline" size="sm" className="h-7 text-[12px]" onClick={() => handleBulkAction("process_images")} disabled={!!bulkLoading}>
-              {bulkLoading === "process_images" ? "処理中..." : "画像処理"}
-            </Button>
-            <div className="w-px h-4 bg-border" />
-            <span className="text-[11px] text-muted-foreground/70">判定:</span>
-            <Button variant="outline" size="sm" className="h-7 text-[12px] border-emerald-500/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10" onClick={() => handleBulkAction("decide_list")} disabled={!!bulkLoading}>
-              {bulkLoading === "decide_list" ? "..." : "出品"}
-            </Button>
-            <Button variant="outline" size="sm" className="h-7 text-[12px] border-amber-500/40 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10" onClick={() => handleBulkAction("decide_considering")} disabled={!!bulkLoading}>
-              {bulkLoading === "decide_considering" ? "..." : "検討"}
-            </Button>
-            <Button variant="outline" size="sm" className="h-7 text-[12px] border-red-500/40 text-red-600 dark:text-red-400 hover:bg-red-500/10" onClick={() => handleBulkAction("decide_pass")} disabled={!!bulkLoading}>
-              {bulkLoading === "decide_pass" ? "..." : "パス"}
-            </Button>
-            <Button variant="ghost" size="sm" className="h-7 text-[12px]" onClick={() => handleBulkAction("decide_clear")} disabled={!!bulkLoading}>
-              クリア
-            </Button>
-            <div className="w-px h-4 bg-border" />
-            <Button variant="destructive" size="sm" className="h-7 text-[12px]" onClick={() => handleBulkAction("delete")} disabled={!!bulkLoading}>
-              {bulkLoading === "delete" ? "削除中..." : "削除"}
-            </Button>
-            <button onClick={() => setSelected(new Set())} className="ml-auto text-[12px] text-muted-foreground hover:text-foreground transition-colors">
-              選択解除
-            </button>
+            </div>
+            <div className="hidden lg:block w-px h-4 bg-border" />
+            <div className="flex items-center gap-2 mt-2 lg:mt-0 lg:contents overflow-x-auto no-scrollbar -mx-1 px-1">
+              <Button variant="outline" size="sm" className="h-9 lg:h-7 text-[12px] shrink-0" onClick={() => handleBulkAction("calculate_costs")} disabled={!!bulkLoading}>
+                {bulkLoading === "calculate_costs" ? "計算中..." : "費用計算"}
+              </Button>
+              <Button variant="outline" size="sm" className="h-9 lg:h-7 text-[12px] shrink-0" onClick={() => handleBulkAction("process_images")} disabled={!!bulkLoading}>
+                {bulkLoading === "process_images" ? "処理中..." : "画像処理"}
+              </Button>
+              <div className="hidden lg:block w-px h-4 bg-border" />
+              <span className="hidden lg:inline text-[11px] text-muted-foreground/70">判定:</span>
+              <Button variant="outline" size="sm" className="h-9 lg:h-7 text-[12px] border-emerald-500/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 shrink-0" onClick={() => handleBulkAction("decide_list")} disabled={!!bulkLoading}>
+                {bulkLoading === "decide_list" ? "..." : "出品"}
+              </Button>
+              <Button variant="outline" size="sm" className="h-9 lg:h-7 text-[12px] border-amber-500/40 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 shrink-0" onClick={() => handleBulkAction("decide_considering")} disabled={!!bulkLoading}>
+                {bulkLoading === "decide_considering" ? "..." : "検討"}
+              </Button>
+              <Button variant="outline" size="sm" className="h-9 lg:h-7 text-[12px] border-red-500/40 text-red-600 dark:text-red-400 hover:bg-red-500/10 shrink-0" onClick={() => handleBulkAction("decide_pass")} disabled={!!bulkLoading}>
+                {bulkLoading === "decide_pass" ? "..." : "パス"}
+              </Button>
+              <Button variant="ghost" size="sm" className="h-9 lg:h-7 text-[12px] shrink-0" onClick={() => handleBulkAction("decide_clear")} disabled={!!bulkLoading}>
+                クリア
+              </Button>
+              <div className="hidden lg:block w-px h-4 bg-border" />
+              <Button variant="destructive" size="sm" className="h-9 lg:h-7 text-[12px] shrink-0" onClick={() => handleBulkAction("delete")} disabled={!!bulkLoading}>
+                {bulkLoading === "delete" ? "削除中..." : "削除"}
+              </Button>
+              <button onClick={() => setSelected(new Set())} className="hidden lg:inline lg:ml-auto text-[12px] text-muted-foreground hover:text-foreground transition-colors">
+                選択解除
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -450,20 +505,26 @@ export default function ItemsPage() {
             const isSelected = selected.has(item.id);
             return (
               <div key={item.id} className="group relative">
-                {/* Checkbox */}
+                {/* Checkbox — larger tap area on mobile, always visible on touch */}
                 <button
                   onClick={(e) => { e.preventDefault(); toggleSelect(item.id); }}
-                  className={`absolute top-2.5 left-2.5 z-10 w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
-                    isSelected
-                      ? "bg-primary border-primary text-white"
-                      : "border-white/60 bg-black/30 backdrop-blur-sm opacity-0 group-hover:opacity-100"
-                  }`}
+                  aria-label={isSelected ? "選択解除" : "選択"}
+                  aria-pressed={isSelected}
+                  className="absolute top-1 left-1 z-10 w-9 h-9 sm:w-8 sm:h-8 flex items-center justify-center"
                 >
-                  {isSelected && (
-                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                    </svg>
-                  )}
+                  <span
+                    className={`w-6 h-6 sm:w-5 sm:h-5 rounded border-2 flex items-center justify-center transition-all ${
+                      isSelected
+                        ? "bg-primary border-primary text-white"
+                        : "border-white/70 bg-black/35 backdrop-blur-sm sm:opacity-0 sm:group-hover:opacity-100"
+                    }`}
+                  >
+                    {isSelected && (
+                      <svg className="w-3.5 h-3.5 sm:w-3 sm:h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                      </svg>
+                    )}
+                  </span>
                 </button>
 
                 <Link
@@ -529,13 +590,93 @@ export default function ItemsPage() {
           })}
         </div>
       ) : (
-        /* List View - Notion-like clean table */
-        <div className="border border-border/60 rounded-lg overflow-x-auto">
+        <>
+          {/* MOBILE: card-style list (clean, big touch targets) */}
+          <div className="sm:hidden border border-border/60 rounded-lg divide-y divide-border/30 overflow-hidden">
+            {paged.map((item) => {
+              let images: string[] = []; try { images = item.processedImages ? JSON.parse(item.processedImages) : item.mercariImages ? JSON.parse(item.mercariImages) : []; } catch { /* ignore */ }
+              const isSelected = selected.has(item.id);
+              const profitVal = item.estimatedProfitUsd;
+              return (
+                <div key={item.id} className={`relative p-3 transition-colors ${isSelected ? "bg-accent/60" : "active:bg-accent/40"}`}>
+                  <div className="flex gap-3">
+                    {/* Checkbox column — large tap area */}
+                    <button
+                      onClick={() => toggleSelect(item.id)}
+                      aria-label={isSelected ? "選択解除" : "選択"}
+                      aria-pressed={isSelected}
+                      className="w-9 h-9 -m-1 flex items-center justify-center flex-shrink-0"
+                    >
+                      <span
+                        className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                          isSelected ? "bg-primary border-primary text-white" : "border-border"
+                        }`}
+                      >
+                        {isSelected && (
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                          </svg>
+                        )}
+                      </span>
+                    </button>
+
+                    {/* Thumbnail */}
+                    <Link href={`/items/${item.id}`} aria-label="アイテム詳細" className="relative w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-accent">
+                      {images[0] ? (
+                        <Image src={images[0]} alt="" fill sizes="64px" className="object-cover" />
+                      ) : null}
+                    </Link>
+
+                    {/* Title + meta */}
+                    <Link href={`/items/${item.id}`} className="flex-1 min-w-0 flex flex-col">
+                      <span className="text-[14px] font-medium leading-snug line-clamp-2 break-words">{item.mercariTitle}</span>
+                      <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[12px] text-muted-foreground tabular-nums">
+                        {item.mercariPrice != null && (
+                          <span>仕入 <span className="text-foreground/80">¥{item.mercariPrice.toLocaleString()}</span></span>
+                        )}
+                        {item.ebayPriceUsd ? (
+                          <span>eBay <span className="text-foreground/80">${item.ebayPriceUsd}</span></span>
+                        ) : null}
+                        {item.aiScore != null && (
+                          <span className={`${item.aiScore >= 70 ? "text-emerald-500" : item.aiScore >= 40 ? "text-amber-500" : "text-red-400"} font-medium`}>
+                            AI {item.aiScore}
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground">
+                        <span className="inline-flex items-center gap-1">
+                          <StatusDot status={item.mercariStatus} />
+                          {statusLabels[item.mercariStatus]}
+                        </span>
+                        <span className="text-border">·</span>
+                        <span className="inline-flex items-center gap-1">
+                          <StatusDot status={item.ebayStatus} />
+                          {statusLabels[item.ebayStatus]}
+                        </span>
+                      </div>
+                    </Link>
+
+                    {/* Profit (right column) */}
+                    {profitVal != null && (
+                      <div className={`text-right tabular-nums font-medium shrink-0 ${profitVal > 0 ? "text-emerald-500" : profitVal < 0 ? "text-red-400" : "text-muted-foreground"}`}>
+                        <div className="text-[15px] leading-tight">${profitVal.toFixed(0)}</div>
+                        <div className="text-[10px] opacity-70 leading-tight">¥{Math.round(profitVal * exchangeRate).toLocaleString()}</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* DESKTOP: Notion-like clean table (sm and up) */}
+          <div className="hidden sm:block border border-border/60 rounded-lg overflow-x-auto">
           {/* Table header */}
-          <div className="sticky top-0 z-10 grid grid-cols-[32px_36px_1fr_72px] sm:grid-cols-[32px_36px_1fr_72px_80px_80px_44px_80px_80px_60px_60px] gap-0 px-3 py-2.5 border-b border-border/60 text-[11px] font-medium text-muted-foreground/70 uppercase tracking-wider bg-accent/30 backdrop-blur-sm">
+          <div className="sticky top-0 z-10 grid grid-cols-[32px_36px_1fr_72px_80px_80px_44px_80px_80px_60px_60px] gap-0 px-3 py-2.5 border-b border-border/60 text-[11px] font-medium text-muted-foreground/70 uppercase tracking-wider bg-accent/30 backdrop-blur-sm">
             <span className="flex items-center">
               <button
                 onClick={toggleSelectAll}
+                aria-label="全て選択"
                 className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
                   selected.size === paged.length && paged.length > 0 ? "bg-primary border-primary text-white" : "border-border hover:border-muted-foreground/40"
                 }`}
@@ -550,13 +691,13 @@ export default function ItemsPage() {
             <span></span>
             <span>商品名</span>
             <span className="text-right">利益</span>
-            <span className="hidden sm:block text-right">仕入れ</span>
-            <span className="hidden sm:block text-right">eBay</span>
-            <span className="hidden sm:block text-right">AI</span>
-            <span className="hidden sm:block">メルカリ</span>
-            <span className="hidden sm:block">eBay</span>
-            <span className="hidden sm:block text-right">作成</span>
-            <span className="hidden sm:block text-right">更新</span>
+            <span className="text-right">仕入れ</span>
+            <span className="text-right">eBay</span>
+            <span className="text-right">AI</span>
+            <span>メルカリ</span>
+            <span>eBay</span>
+            <span className="text-right">作成</span>
+            <span className="text-right">更新</span>
           </div>
           {/* Table rows */}
           <div>
@@ -566,7 +707,7 @@ export default function ItemsPage() {
               return (
                 <div
                   key={item.id}
-                  className={`grid grid-cols-[32px_36px_1fr_72px] sm:grid-cols-[32px_36px_1fr_72px_80px_80px_44px_80px_80px_60px_60px] gap-0 px-3 py-2 items-center transition-colors ${
+                  className={`grid grid-cols-[32px_36px_1fr_72px_80px_80px_44px_80px_80px_60px_60px] gap-0 px-3 py-2 items-center transition-colors ${
                     isSelected
                       ? "bg-accent/60"
                       : "hover:bg-accent/40"
@@ -575,6 +716,8 @@ export default function ItemsPage() {
                   <span className="flex items-center">
                     <button
                       onClick={() => toggleSelect(item.id)}
+                      aria-label={isSelected ? "選択解除" : "選択"}
+                      aria-pressed={isSelected}
                       className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
                         isSelected ? "bg-primary border-primary text-white" : "border-border hover:border-muted-foreground/40"
                       }`}
@@ -633,16 +776,17 @@ export default function ItemsPage() {
               );
             })}
           </div>
-        </div>
+          </div>
+        </>
       )}
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-1.5 pt-2">
+        <div className="flex flex-wrap items-center justify-center gap-1.5 pt-2">
           <Button
             variant="ghost"
             size="sm"
-            className="h-7 px-2.5 text-[12px]"
+            className="h-9 sm:h-7 px-3 sm:px-2.5 text-[13px] sm:text-[12px]"
             disabled={page === 1}
             onClick={() => setPage(page - 1)}
           >
@@ -664,7 +808,7 @@ export default function ItemsPage() {
                 <button
                   key={pageNum}
                   onClick={() => setPage(pageNum)}
-                  className={`w-7 h-7 rounded text-[12px] font-medium transition-colors ${
+                  className={`w-9 h-9 sm:w-7 sm:h-7 rounded text-[13px] sm:text-[12px] font-medium transition-colors ${
                     page === pageNum
                       ? "bg-accent text-foreground"
                       : "hover:bg-accent/50 text-muted-foreground"
@@ -678,21 +822,21 @@ export default function ItemsPage() {
           <Button
             variant="ghost"
             size="sm"
-            className="h-7 px-2.5 text-[12px]"
+            className="h-9 sm:h-7 px-3 sm:px-2.5 text-[13px] sm:text-[12px]"
             disabled={page === totalPages}
             onClick={() => setPage(page + 1)}
           >
             次へ
           </Button>
-          <span className="text-[11px] text-muted-foreground/60 ml-2 tabular-nums">
+          <span className="basis-full sm:basis-auto text-center sm:text-left text-[11px] text-muted-foreground/60 sm:ml-2 tabular-nums">
             {(page - 1) * pageSize + 1}-{Math.min(page * pageSize, filtered.length)} / {filtered.length}件
           </span>
-          <div className="ml-auto flex items-center gap-1.5">
-            <span className="text-[11px] text-muted-foreground/60">表示</span>
+          <div className="basis-full sm:basis-auto sm:ml-auto flex items-center justify-center sm:justify-end gap-1.5">
+            <span className="text-[12px] sm:text-[11px] text-muted-foreground/60">表示</span>
             <select
               value={pageSize}
               onChange={(e) => setPageSize(parseInt(e.target.value, 10))}
-              className="h-7 rounded-md border border-border bg-background px-2 text-[12px] tabular-nums"
+              className="h-9 sm:h-7 rounded-md border border-border bg-background px-2 text-[13px] sm:text-[12px] tabular-nums"
             >
               {PAGE_SIZE_OPTIONS.map((n) => (
                 <option key={n} value={n}>{n}件</option>

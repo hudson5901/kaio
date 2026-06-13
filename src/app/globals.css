@@ -220,3 +220,60 @@
 .animate-fade-in {
   animation: fade-in 0.3s ease-out;
 }
+
+/* --- Mobile UX helpers --- */
+
+/* iOS Safari は input の font-size が 16px 未満だとフォーカス時に自動ズームする。
+   モバイル時のみ生 input / textarea / select / contenteditable に 16px を強制し、
+   デスクトップ表示や個別 className で text-xs / text-[12px] 等を当てたい場面では
+   md: 以上で上書きできるよう @media で分離している。 */
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+  textarea,
+  select,
+  [contenteditable="true"] {
+    font-size: 16px;
+  }
+}
+
+/* iOS ホームバー / ノッチ用の safe-area パディング */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
+.h-safe-bottom {
+  height: env(safe-area-inset-bottom);
+}
+
+/* モバイルでだけ最小 44x44 のタップ領域を確保するためのヘルパー。
+   small buttons (w-6 / h-7 等) に重ねがけしてもデスクトップでは見た目を維持できる。 */
+@media (max-width: 767px) {
+  .tap-target {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .tap-target-h {
+    min-height: 44px;
+  }
+}
+
+/* 水平スクロール領域でスクロールバーを隠したいとき (chip 群など) */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* モバイルで下部固定ナビが出る画面用: コンテンツ末尾の被り防止 */
+.has-mobile-bottom-nav {
+  padding-bottom: calc(64px + env(safe-area-inset-bottom));
+}
+@media (min-width: 1024px) {
+  .has-mobile-bottom-nav {
+    padding-bottom: 0;
+  }
+}

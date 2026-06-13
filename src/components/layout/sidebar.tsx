@@ -111,14 +111,16 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
   return (
     <aside
       className={`fixed inset-y-0 left-0 bg-sidebar flex flex-col z-30 transition-all duration-200 ${
-        collapsed ? "w-14 -translate-x-full lg:translate-x-0" : "w-60"
+        collapsed
+          ? "w-14 -translate-x-full lg:translate-x-0"
+          : "w-72 max-w-[85vw] lg:w-60"
       }`}
     >
       {/* Header with toggle */}
-      <div className="h-12 flex items-center px-3 gap-2">
+      <div className="h-14 lg:h-12 flex items-center px-3 gap-2">
         <button
           onClick={onToggle}
-          className="w-8 h-8 rounded-md flex items-center justify-center text-muted-foreground hover:bg-accent hover:text-foreground transition-colors flex-shrink-0"
+          className="w-11 h-11 lg:w-8 lg:h-8 rounded-md flex items-center justify-center text-muted-foreground hover:bg-accent hover:text-foreground transition-colors flex-shrink-0"
           title={collapsed ? "サイドバーを開く" : "サイドバーを閉じる"}
           aria-label={collapsed ? "サイドバーを開く" : "サイドバーを閉じる"}
           aria-expanded={!collapsed}
@@ -152,7 +154,7 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
               href={item.href}
               title={collapsed ? item.label : undefined}
               className={`
-                flex items-center gap-2.5 rounded-md px-2.5 py-[7px] text-[13px] transition-colors
+                flex items-center gap-2.5 rounded-md px-2.5 py-2.5 lg:py-[7px] text-[14px] lg:text-[13px] transition-colors
                 ${collapsed ? "justify-center px-0" : ""}
                 ${active
                   ? "bg-accent text-foreground font-medium"
@@ -173,7 +175,7 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
               href="/admin/users"
               title={collapsed ? "ユーザー管理" : undefined}
               className={`
-                flex items-center gap-2.5 rounded-md px-2.5 py-[7px] text-[13px] transition-colors
+                flex items-center gap-2.5 rounded-md px-2.5 py-2.5 lg:py-[7px] text-[14px] lg:text-[13px] transition-colors
                 ${collapsed ? "justify-center px-0" : ""}
                 ${isActive("/admin/users")
                   ? "bg-accent text-foreground font-medium"
@@ -210,7 +212,7 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
                     await fetch("/api/auth/logout", { method: "POST" });
                     window.location.href = "/login";
                   }}
-                  className="p-1 rounded text-muted-foreground/60 hover:text-foreground hover:bg-accent transition-colors flex-shrink-0"
+                  className="w-10 h-10 lg:w-7 lg:h-7 rounded text-muted-foreground/60 hover:text-foreground hover:bg-accent transition-colors flex items-center justify-center flex-shrink-0"
                   title="ログアウト"
                   aria-label="ログアウト"
                 >

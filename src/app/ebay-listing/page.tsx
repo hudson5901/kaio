@@ -227,31 +227,31 @@ export default function EbayListingPage() {
     <div className="space-y-5">
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">eBay出品</h1>
+          <h1 className="text-[22px] sm:text-2xl font-semibold tracking-tight">eBay出品</h1>
           <p className="text-[13px] text-muted-foreground mt-1">
             「出品」判定のアイテム <span className="font-medium text-foreground">{items.length}</span>件
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="grid grid-cols-2 sm:flex gap-2">
           <Button
             variant="outline"
             size="sm"
-            className="gap-1.5 text-[12px] h-8"
+            className="gap-1.5 text-[13px] sm:text-[12px] h-10 sm:h-8"
             onClick={handleEbaySync}
             disabled={syncing}
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${syncing ? "animate-spin" : ""}`} />
+            <RefreshCw className={`w-4 h-4 sm:w-3.5 sm:h-3.5 ${syncing ? "animate-spin" : ""}`} />
             {syncing ? "同期中..." : "eBay同期"}
           </Button>
           <Button
             variant="outline"
             size="sm"
-            className="gap-1.5 text-[12px] h-8"
+            className="gap-1.5 text-[13px] sm:text-[12px] h-10 sm:h-8"
             onClick={handleCsvExport}
             disabled={items.length === 0}
           >
-            <Download className="w-3.5 h-3.5" />
-            CSV出力{selected.size > 0 ? ` (${selected.size}件)` : ""}
+            <Download className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
+            CSV{selected.size > 0 ? ` (${selected.size})` : ""}
           </Button>
         </div>
       </div>
@@ -308,18 +308,18 @@ export default function EbayListingPage() {
           { key: "listed", label: "出品中", count: listedCount },
         ];
         return (
-          <div className="flex gap-1 border-b border-border/60 -mb-2">
+          <div className="flex gap-1 border-b border-border/60 -mb-2 overflow-x-auto no-scrollbar -mx-3 px-3 sm:mx-0 sm:px-0">
             {filters.map((f) => (
               <button
                 key={f.key}
                 onClick={() => setStatusFilter(f.key)}
-                className={`px-3 py-2 text-[12px] font-medium border-b-2 transition-colors ${
+                className={`shrink-0 px-3 py-3 sm:py-2 text-[13px] sm:text-[12px] font-medium border-b-2 transition-colors whitespace-nowrap ${
                   statusFilter === f.key
                     ? "border-primary text-foreground"
                     : "border-transparent text-muted-foreground hover:text-foreground"
                 }`}
               >
-                {f.label} <span className="text-muted-foreground/60 ml-0.5">{f.count}</span>
+                {f.label} <span className="text-muted-foreground/60 ml-0.5 tabular-nums">{f.count}</span>
               </button>
             ))}
           </div>
@@ -335,13 +335,15 @@ export default function EbayListingPage() {
 
       {/* Search */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/50" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-3.5 sm:h-3.5 text-muted-foreground/50" />
         <input
           type="text"
           placeholder="商品名・eBayタイトル・IDで検索..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full h-8 pl-8 pr-3 rounded-md border border-border/60 bg-transparent text-[13px] placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-ring"
+          inputMode="search"
+          enterKeyHint="search"
+          className="w-full h-10 sm:h-8 pl-9 sm:pl-8 pr-3 rounded-md border border-border/60 bg-transparent text-[15px] sm:text-[13px] placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-ring"
         />
       </div>
 
@@ -382,9 +384,81 @@ export default function EbayListingPage() {
           </Link>
         </div>
       ) : (
-        <div className="border border-border/60 rounded-lg overflow-x-auto">
+        <>
+          {/* MOBILE: card list */}
+          <div className="sm:hidden border border-border/60 rounded-lg divide-y divide-border/30 overflow-hidden">
+            {sortedItems.map((item) => {
+              let images: string[] = [];
+              try { images = item.processedImages ? JSON.parse(item.processedImages) : item.mercariImages ? JSON.parse(item.mercariImages) : []; } catch { /* ignore */ }
+              const isSelected = selected.has(item.id);
+              const profitVal = (item.mercariPrice ?? 0) > 0 ? item.estimatedProfitUsd : null;
+              return (
+                <div key={item.id} className={`relative p-3 transition-colors ${isSelected ? "bg-accent/60" : "active:bg-accent/40"}`}>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => toggleSelect(item.id)}
+                      aria-label={isSelected ? "選択解除" : "選択"}
+                      aria-pressed={isSelected}
+                      className="w-9 h-9 -m-1 flex items-center justify-center flex-shrink-0"
+                    >
+                      <span className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${isSelected ? "bg-primary border-primary text-white" : "border-border"}`}>
+                        {isSelected && (
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                          </svg>
+                        )}
+                      </span>
+                    </button>
+                    <Link href={`/items/${item.id}?from=ebay-listing`} aria-label="アイテム詳細" className="relative w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-accent">
+                      {images[0] ? (
+                        <Image src={images[0]} alt="" fill sizes="64px" className="object-cover" />
+                      ) : null}
+                    </Link>
+                    <Link href={`/items/${item.id}?from=ebay-listing`} className="flex-1 min-w-0 flex flex-col">
+                      <span className="text-[14px] font-medium leading-snug line-clamp-2 break-words">{item.mercariTitle}</span>
+                      <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[12px] text-muted-foreground tabular-nums">
+                        {(item.mercariPrice ?? 0) > 0 && (
+                          <span>仕入 <span className="text-foreground/80">¥{item.mercariPrice!.toLocaleString()}</span></span>
+                        )}
+                        {item.ebayPriceUsd ? (
+                          <span>eBay <span className="text-foreground/80">${item.ebayPriceUsd}</span></span>
+                        ) : null}
+                        {item.shippingCostUsd ? (
+                          <span>送料 <span className="text-foreground/80">${item.shippingCostUsd.toFixed(1)}</span></span>
+                        ) : null}
+                      </div>
+                      <div className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground">
+                        {item.listingScheduledAt && (
+                          <span className="inline-flex items-center gap-1 text-emerald-500">
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                            </svg>
+                            確認済
+                          </span>
+                        )}
+                        {item.aiScore != null && (
+                          <span className={`${item.aiScore >= 70 ? "text-emerald-500" : item.aiScore >= 40 ? "text-amber-500" : "text-red-400"} font-medium`}>
+                            AI {item.aiScore}
+                          </span>
+                        )}
+                      </div>
+                    </Link>
+                    {profitVal != null && (
+                      <div className={`text-right tabular-nums font-medium shrink-0 ${profitVal > 0 ? "text-emerald-500" : profitVal < 0 ? "text-red-400" : "text-muted-foreground"}`}>
+                        <div className="text-[15px] leading-tight">${profitVal.toFixed(0)}</div>
+                        <div className="text-[10px] opacity-70 leading-tight">利益</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* DESKTOP table (sm+) */}
+          <div className="hidden sm:block border border-border/60 rounded-lg overflow-x-auto">
           {/* Table header */}
-          <div className="sticky top-0 z-10 grid grid-cols-[32px_36px_1fr_80px] sm:grid-cols-[32px_36px_1fr_80px_80px_80px_80px_60px_50px] gap-0 px-3 py-2.5 border-b border-border/60 text-[11px] font-medium text-muted-foreground/70 uppercase tracking-wider bg-accent/30 backdrop-blur-sm">
+          <div className="sticky top-0 z-10 grid grid-cols-[32px_36px_1fr_80px_80px_80px_80px_60px_50px] gap-0 px-3 py-2.5 border-b border-border/60 text-[11px] font-medium text-muted-foreground/70 uppercase tracking-wider bg-accent/30 backdrop-blur-sm">
             <span className="flex items-center">
               <button
                 onClick={toggleSelectAll}
@@ -402,11 +476,11 @@ export default function EbayListingPage() {
             <span></span>
             <button onClick={() => toggleSort("title")} className="group flex items-center gap-1 text-left">商品名 <SortIcon active={sortKey === "title"} dir={sortDir} /></button>
             <button onClick={() => toggleSort("profit")} className="group flex items-center gap-0.5 justify-end">利益 <SortIcon active={sortKey === "profit"} dir={sortDir} /></button>
-            <button onClick={() => toggleSort("mercariPrice")} className="hidden sm:flex group items-center gap-0.5 justify-end">仕入れ <SortIcon active={sortKey === "mercariPrice"} dir={sortDir} /></button>
-            <button onClick={() => toggleSort("ebayPrice")} className="hidden sm:flex group items-center gap-0.5 justify-end">eBay価格 <SortIcon active={sortKey === "ebayPrice"} dir={sortDir} /></button>
-            <button onClick={() => toggleSort("shipping")} className="hidden sm:flex group items-center gap-0.5 justify-end">送料 <SortIcon active={sortKey === "shipping"} dir={sortDir} /></button>
-            <span className="hidden sm:block text-center">確認</span>
-            <button onClick={() => toggleSort("ai")} className="hidden sm:flex group items-center gap-0.5 justify-end">AI <SortIcon active={sortKey === "ai"} dir={sortDir} /></button>
+            <button onClick={() => toggleSort("mercariPrice")} className="group flex items-center gap-0.5 justify-end">仕入れ <SortIcon active={sortKey === "mercariPrice"} dir={sortDir} /></button>
+            <button onClick={() => toggleSort("ebayPrice")} className="group flex items-center gap-0.5 justify-end">eBay価格 <SortIcon active={sortKey === "ebayPrice"} dir={sortDir} /></button>
+            <button onClick={() => toggleSort("shipping")} className="group flex items-center gap-0.5 justify-end">送料 <SortIcon active={sortKey === "shipping"} dir={sortDir} /></button>
+            <span className="text-center">確認</span>
+            <button onClick={() => toggleSort("ai")} className="group flex items-center gap-0.5 justify-end">AI <SortIcon active={sortKey === "ai"} dir={sortDir} /></button>
           </div>
           {/* Table rows */}
           <div>
@@ -417,7 +491,7 @@ export default function EbayListingPage() {
               return (
                 <div
                   key={item.id}
-                  className={`grid grid-cols-[32px_36px_1fr_80px] sm:grid-cols-[32px_36px_1fr_80px_80px_80px_80px_60px_50px] gap-0 px-3 py-2 items-center transition-colors ${
+                  className={`grid grid-cols-[32px_36px_1fr_80px_80px_80px_80px_60px_50px] gap-0 px-3 py-2 items-center transition-colors ${
                     isSelected ? "bg-accent/60" : "hover:bg-accent/40"
                   } ${index > 0 ? "border-t border-border/30" : ""}`}
                 >
@@ -450,10 +524,10 @@ export default function EbayListingPage() {
                       ? `$${item.estimatedProfitUsd.toFixed(0)}`
                       : <span className="text-muted-foreground/30">--</span>}
                   </span>
-                  <span className="hidden sm:block text-[13px] text-right tabular-nums text-muted-foreground">{(item.mercariPrice ?? 0) > 0 ? `¥${item.mercariPrice!.toLocaleString()}` : <span className="text-muted-foreground/30">--</span>}</span>
-                  <span className="hidden sm:block text-[13px] text-right tabular-nums">{item.ebayPriceUsd ? `$${item.ebayPriceUsd}` : <span className="text-muted-foreground/30">--</span>}</span>
-                  <span className="hidden sm:block text-[13px] text-right tabular-nums text-muted-foreground">{item.shippingCostUsd ? `$${item.shippingCostUsd.toFixed(1)}` : <span className="text-muted-foreground/30">--</span>}</span>
-                  <div className="hidden sm:flex justify-center">
+                  <span className="text-[13px] text-right tabular-nums text-muted-foreground">{(item.mercariPrice ?? 0) > 0 ? `¥${item.mercariPrice!.toLocaleString()}` : <span className="text-muted-foreground/30">--</span>}</span>
+                  <span className="text-[13px] text-right tabular-nums">{item.ebayPriceUsd ? `$${item.ebayPriceUsd}` : <span className="text-muted-foreground/30">--</span>}</span>
+                  <span className="text-[13px] text-right tabular-nums text-muted-foreground">{item.shippingCostUsd ? `$${item.shippingCostUsd.toFixed(1)}` : <span className="text-muted-foreground/30">--</span>}</span>
+                  <div className="flex justify-center">
                     {item.listingScheduledAt ? (
                       <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500/15 text-emerald-500">
                         <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
@@ -464,14 +538,15 @@ export default function EbayListingPage() {
                       <span className="text-[11px] text-muted-foreground/40">--</span>
                     )}
                   </div>
-                  <span className={`hidden sm:block text-[12px] text-right tabular-nums font-medium ${item.aiScore != null && item.aiScore >= 70 ? "text-emerald-500" : item.aiScore != null && item.aiScore >= 40 ? "text-amber-500" : item.aiScore != null ? "text-red-400" : ""}`}>
+                  <span className={`text-[12px] text-right tabular-nums font-medium ${item.aiScore != null && item.aiScore >= 70 ? "text-emerald-500" : item.aiScore != null && item.aiScore >= 40 ? "text-amber-500" : item.aiScore != null ? "text-red-400" : ""}`}>
                     {item.aiScore != null ? item.aiScore : <span className="text-muted-foreground/30">--</span>}
                   </span>
                 </div>
               );
             })}
           </div>
-        </div>
+          </div>
+        </>
       )}
 
       {/* Validation Modal */}
