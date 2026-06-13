@@ -177,15 +177,15 @@ export default function AdminUsersPage() {
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between pt-2">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight">ユーザー管理</h1>
+      <div className="flex items-center justify-between gap-3 pt-2">
+        <div className="min-w-0">
+          <h1 className="text-[22px] sm:text-xl font-bold tracking-tight">ユーザー管理</h1>
           <p className="text-xs text-muted-foreground mt-0.5">
             {users.length} ユーザー
           </p>
         </div>
-        <Button onClick={() => setShowForm(!showForm)}>
-          {showForm ? "キャンセル" : "新規ユーザー"}
+        <Button className="h-11 sm:h-9 px-4 text-[14px] sm:text-sm" onClick={() => setShowForm(!showForm)}>
+          {showForm ? "キャンセル" : "新規"}
         </Button>
       </div>
 
@@ -200,7 +200,7 @@ export default function AdminUsersPage() {
       {showForm && (
         <div className="rounded-xl bg-card border border-border p-4">
           <h2 className="text-sm font-semibold mb-3">新規ユーザー作成</h2>
-          <form onSubmit={handleCreate} className="grid grid-cols-2 gap-3">
+          <form onSubmit={handleCreate} className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="text-[11px] font-medium text-muted-foreground block mb-1">
                 名前
@@ -254,21 +254,115 @@ export default function AdminUsersPage() {
                     role: e.target.value as "admin" | "member",
                   })
                 }
-                className="w-full h-8 rounded-lg border border-border bg-background px-3 text-sm"
+                className="w-full h-11 sm:h-9 rounded-lg border border-border bg-background px-3 text-sm"
               >
                 <option value="member">メンバー</option>
                 <option value="admin">管理者</option>
               </select>
             </div>
-            <div className="col-span-2 flex justify-end">
-              <Button type="submit">作成</Button>
+            <div className="sm:col-span-2 flex justify-end">
+              <Button type="submit" className="h-11 sm:h-9 w-full sm:w-auto">作成</Button>
             </div>
           </form>
         </div>
       )}
 
-      {/* User List */}
-      <div className="rounded-xl bg-card border border-border overflow-hidden">
+      {/* User List — MOBILE cards / DESKTOP table */}
+      <div className="sm:hidden rounded-xl bg-card border border-border divide-y divide-border overflow-hidden">
+        {users.map((user) => {
+          const isEditing = editingId === user.id;
+          if (isEditing) {
+            return (
+              <div key={user.id} className="p-3 space-y-2">
+                <Input
+                  value={editData.name}
+                  onChange={(e) => setEditData({ ...editData, name: e.target.value })}
+                  placeholder="名前"
+                  className="h-11"
+                />
+                <Input
+                  type="email"
+                  value={editData.email}
+                  onChange={(e) => setEditData({ ...editData, email: e.target.value })}
+                  placeholder="メール"
+                  className="h-11"
+                />
+                <select
+                  value={editData.role}
+                  onChange={(e) => setEditData({ ...editData, role: e.target.value as "admin" | "member" })}
+                  className="w-full h-11 rounded-lg border border-border bg-background px-3 text-sm"
+                >
+                  <option value="member">メンバー</option>
+                  <option value="admin">管理者</option>
+                </select>
+                <div className="flex gap-2 pt-1">
+                  <Button
+                    size="sm"
+                    className="flex-1 h-11 text-[14px]"
+                    onClick={() => handleUpdate(user.id)}
+                    disabled={saving === user.id}
+                  >
+                    {saving === user.id ? "保存中..." : "保存"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="flex-1 h-11 text-[14px]"
+                    onClick={() => setEditingId(null)}
+                    disabled={saving === user.id}
+                  >
+                    取消
+                  </Button>
+                </div>
+              </div>
+            );
+          }
+          return (
+            <div key={user.id} className="p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[14px] font-medium">{user.name}</span>
+                    <span
+                      className={`inline-flex items-center px-1.5 py-px rounded text-[10px] font-medium ${
+                        user.role === "admin"
+                          ? "bg-purple-500/15 text-purple-400"
+                          : "bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      {user.role === "admin" ? "管理者" : "メンバー"}
+                    </span>
+                  </div>
+                  <p className="text-[12px] text-muted-foreground truncate mt-0.5">{user.email}</p>
+                  <p className="text-[11px] text-muted-foreground/60 mt-0.5">{formatDate(user.createdAt)}</p>
+                </div>
+              </div>
+              <div className="flex gap-2 mt-2.5">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="flex-1 h-10 text-[13px]"
+                  onClick={() => startEdit(user)}
+                >
+                  編集
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="flex-1 h-10 text-[13px] text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                  onClick={() => setConfirmDel({ id: user.id, name: user.name })}
+                  disabled={deleting === user.id}
+                >
+                  {deleting === user.id ? "削除中..." : "削除"}
+                </Button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* DESKTOP table */}
+      <div className="hidden sm:block rounded-xl bg-card border border-border overflow-hidden">
         <table className="w-full">
           <thead>
             <tr className="border-b border-border text-xs text-muted-foreground uppercase tracking-wider">

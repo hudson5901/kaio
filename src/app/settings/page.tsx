@@ -180,7 +180,7 @@ export default function SettingsPage() {
             <div className={`w-3 h-3 rounded-full ${rateInfo?.source === "fallback" ? "bg-amber-400" : "bg-emerald-400"} animate-pulse`} />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {([
               { key: "profitMarginPercent", label: "利益マージン (%)", step: "0.1" },
               { key: "ebayFeePercent", label: "eBay手数料率 (%)", step: "0.1" },
@@ -195,28 +195,29 @@ export default function SettingsPage() {
               const err = fieldErrors[f.key];
               return (
                 <div key={f.key}>
-                  <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider block mb-1">{f.label}</label>
+                  <label className="text-[12px] sm:text-[11px] font-medium text-muted-foreground uppercase tracking-wider block mb-1">{f.label}</label>
                   <Input
                     type="number"
+                    inputMode="decimal"
                     value={drafts[f.key] ?? ""}
                     onChange={(e) => updateDraft(f.key, e.target.value)}
                     onKeyDown={(e) => { if (e.key === "e" || e.key === "E") e.preventDefault(); }}
-                    className={`h-9 ${err ? "border-red-500 focus-visible:ring-red-500/30" : ""}`}
+                    className={`h-11 sm:h-9 ${err ? "border-red-500 focus-visible:ring-red-500/30" : ""}`}
                     step={f.step}
                     min={spec.min}
                     max={spec.max}
                     aria-invalid={!!err}
                     aria-describedby={err ? `${f.key}-err` : undefined}
                   />
-                  {err && <p id={`${f.key}-err`} className="text-[10px] text-red-500 mt-1">{err}</p>}
-                  {!err && f.hint && <p className="text-[10px] text-muted-foreground/70 mt-1">{f.hint}</p>}
+                  {err && <p id={`${f.key}-err`} className="text-[12px] sm:text-[10px] text-red-500 mt-1">{err}</p>}
+                  {!err && f.hint && <p className="text-[12px] sm:text-[10px] text-muted-foreground/70 mt-1">{f.hint}</p>}
                 </div>
               );
             })}
           </div>
 
           <div className="space-y-2">
-            <Button onClick={handleSave} disabled={saving || hasErrors} className="gap-2">
+            <Button onClick={handleSave} disabled={saving || hasErrors} className="gap-2 h-11 sm:h-9 w-full sm:w-auto">
               {saved ? (
                 <>
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>

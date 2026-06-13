@@ -84,29 +84,29 @@ export default function NotificationsPage() {
 
   return (
     <div className="space-y-5 max-w-3xl">
-      <div className="flex items-end justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">通知</h1>
+          <h1 className="text-[22px] sm:text-2xl font-semibold tracking-tight">通知</h1>
           <p className="text-[13px] text-muted-foreground mt-0.5">
             {unreadCount > 0 ? `${unreadCount}件の未読` : "全て既読"}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="grid grid-cols-2 sm:flex gap-2">
           {unreadCount > 0 && (
-            <Button variant="outline" size="sm" className="h-8 text-[12px]" onClick={markAllRead}>
+            <Button variant="outline" size="sm" className="h-10 sm:h-8 text-[13px] sm:text-[12px]" onClick={markAllRead}>
               全て既読にする
             </Button>
           )}
           {notifications.some((n) => n.read) && (
-            <Button variant="ghost" size="sm" className="h-8 text-[12px] text-muted-foreground" onClick={() => setConfirmDeleteRead(true)}>
+            <Button variant="ghost" size="sm" className="h-10 sm:h-8 text-[13px] sm:text-[12px] text-muted-foreground" onClick={() => setConfirmDeleteRead(true)}>
               既読を削除
             </Button>
           )}
         </div>
       </div>
 
-      {/* Type filter */}
-      <div className="flex gap-1.5">
+      {/* Type filter — horizontal scroll on mobile */}
+      <div className="flex gap-1.5 overflow-x-auto no-scrollbar -mx-3 px-3 sm:mx-0 sm:px-0">
         {[
           { key: "all", label: "全て" },
           { key: "new_items", label: "新規取得" },
@@ -118,7 +118,7 @@ export default function NotificationsPage() {
           <button
             key={f.key}
             onClick={() => setFilter(f.key)}
-            className={`px-3 py-1.5 rounded-md text-[12px] font-medium transition-colors ${
+            className={`shrink-0 px-3.5 py-2.5 sm:py-1.5 rounded-md text-[13px] sm:text-[12px] font-medium transition-colors whitespace-nowrap ${
               filter === f.key
                 ? "bg-accent text-foreground"
                 : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
@@ -171,24 +171,26 @@ export default function NotificationsPage() {
                     )}
                   </div>
                 </div>
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex items-center gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity shrink-0">
                   {!n.read && (
                     <button
                       onClick={() => markRead(n.id)}
-                      className="p-1.5 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                      aria-label="既読にする"
+                      className="w-10 h-10 lg:w-7 lg:h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
                       title="既読にする"
                     >
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <svg className="w-4 h-4 lg:w-3.5 lg:h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
                       </svg>
                     </button>
                   )}
                   <button
                     onClick={() => deleteOne(n.id)}
-                    className="p-1.5 rounded-md text-muted-foreground hover:bg-red-500/10 hover:text-red-500 transition-colors"
+                    aria-label="削除"
+                    className="w-10 h-10 lg:w-7 lg:h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-red-500/10 hover:text-red-500 transition-colors"
                     title="削除"
                   >
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <svg className="w-4 h-4 lg:w-3.5 lg:h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
                     </svg>
                   </button>

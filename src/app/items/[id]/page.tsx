@@ -212,9 +212,10 @@ function DimensionInput({ label, val, onSave }: {
   }, [val, focused]);
   return (
     <div>
-      <label className="text-[11px] text-muted-foreground block mb-0.5">{label}</label>
+      <label className="text-[12px] lg:text-[11px] text-muted-foreground block mb-1 lg:mb-0.5">{label}</label>
       <Input
         type="number"
+        inputMode="decimal"
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onFocus={() => setFocused(true)}
@@ -226,7 +227,7 @@ function DimensionInput({ label, val, onSave }: {
           if (next === (val ?? null)) return;
           await onSave(next);
         }}
-        className="h-8 text-sm"
+        className="h-11 lg:h-8 text-base lg:text-sm"
       />
     </div>
   );
@@ -836,17 +837,17 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
                   <button
                     key={value}
                     onClick={() => handleDecision(value)}
-                    className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg border py-2 text-xs font-medium transition-all ${
+                    className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg border py-3 lg:py-2 text-[14px] lg:text-xs font-medium transition-all ${
                       isActive
                         ? colorClasses[color]
                         : "border-border text-muted-foreground hover:bg-accent hover:text-foreground"
                     }`}
                   >
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <svg className="w-4 h-4 lg:w-3.5 lg:h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d={icon} />
                     </svg>
                     {label}
-                    <kbd className="ml-1 text-[10px] opacity-40 font-mono">{key}</kbd>
+                    <kbd className="hidden lg:inline ml-1 text-[10px] opacity-40 font-mono">{key}</kbd>
                   </button>
                 );
               })}
@@ -870,7 +871,7 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
           <div className="rounded-xl bg-card border border-border overflow-hidden">
             <div className="px-4 py-2.5 border-b border-border bg-muted/30 flex items-center justify-between">
               <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">兜カテゴリ</h3>
-              <Button size="sm" variant="outline" onClick={handleClassify} disabled={classifying} className="text-xs gap-1 h-6 px-2">
+              <Button size="sm" variant="outline" onClick={handleClassify} disabled={classifying} className="text-[12px] lg:text-xs gap-1 h-9 lg:h-6 px-3 lg:px-2">
                 {classifying ? (
                   <><svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" /></svg>分類中</>
                 ) : (
@@ -879,7 +880,7 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
               </Button>
             </div>
             <div className="p-3">
-              <div className="grid grid-cols-3 gap-1.5">
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 lg:gap-1.5">
                 {([
                   { id: "A", label: "A: 複合兜", icon: "🎎" },
                   { id: "B", label: "B: 鎧兜セット", icon: "⚔️" },
@@ -893,7 +894,7 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
                     <button
                       key={catId}
                       onClick={() => handleSetCategory(isActive ? "" : catId)}
-                      className={`flex items-center justify-center gap-1 rounded-lg border py-2 px-1 text-[11px] font-medium transition-all ${
+                      className={`flex items-center justify-center gap-1.5 rounded-lg border py-3 lg:py-2 px-2 lg:px-1 text-[13px] lg:text-[11px] font-medium transition-all ${
                         isActive
                           ? "bg-primary/15 border-primary/40 text-primary"
                           : "border-border text-muted-foreground hover:bg-accent hover:text-foreground"
@@ -1254,7 +1255,7 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
           <div className="rounded-xl bg-card border border-border overflow-hidden">
             <div className="px-4 py-2.5 border-b border-border bg-muted/30 flex items-center justify-between">
               <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">AIスコア</h3>
-              <Button size="sm" variant="outline" onClick={handleScore} disabled={scoring} className="text-xs gap-1 h-6 px-2">
+              <Button size="sm" variant="outline" onClick={handleScore} disabled={scoring} className="text-[12px] lg:text-xs gap-1 h-9 lg:h-6 px-3 lg:px-2">
                 {scoring ? (
                   <><svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" /></svg>分析中</>
                 ) : (
@@ -1843,17 +1844,17 @@ function EbayPreview({
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => onSave("ebayTitle", draftTitle)}
-                          className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+                          className="px-4 py-2.5 sm:py-1 text-[13px] sm:text-xs font-medium bg-blue-600 text-white rounded hover:bg-blue-700"
                         >
                           保存
                         </button>
                         <button
                           onClick={() => setEditingTitle(false)}
-                          className="px-3 py-1 text-xs text-gray-500 hover:text-gray-700"
+                          className="px-4 py-2.5 sm:py-1 text-[13px] sm:text-xs text-gray-500 hover:text-gray-700"
                         >
                           キャンセル
                         </button>
-                        <span className="text-[10px] text-gray-400 ml-auto">{draftTitle.length}/80</span>
+                        <span className="text-[11px] sm:text-[10px] text-gray-400 ml-auto">{draftTitle.length}/80</span>
                       </div>
                     </div>
                   ) : (
@@ -1995,13 +1996,13 @@ function EbayPreview({
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => onSave("ebayDescription", draftDesc)}
-                      className="px-4 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+                      className="px-5 py-2.5 sm:py-1.5 text-[13px] sm:text-xs font-medium bg-blue-600 text-white rounded hover:bg-blue-700"
                     >
                       保存
                     </button>
                     <button
                       onClick={() => setEditingDesc(false)}
-                      className="px-4 py-1.5 text-xs text-gray-500 hover:text-gray-700"
+                      className="px-5 py-2.5 sm:py-1.5 text-[13px] sm:text-xs text-gray-500 hover:text-gray-700"
                     >
                       キャンセル
                     </button>

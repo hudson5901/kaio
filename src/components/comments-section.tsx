@@ -486,7 +486,7 @@ export function CommentsSection({ itemId }: { itemId: string }) {
                     onKeyDown={handleTextareaKeyDown}
                     onKeyUp={handleTextareaKeyUp}
                     placeholder="コメントを入力... @でメンションできます"
-                    className="min-h-[52px] resize-none text-xs"
+                    className="min-h-[52px] resize-none text-[15px] md:text-xs"
                   />
 
                   {/* Mention dropdown */}
@@ -504,7 +504,7 @@ export function CommentsSection({ itemId }: { itemId: string }) {
                           <button
                             key={user.id}
                             type="button"
-                            className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs transition-colors hover:bg-accent ${
+                            className={`flex w-full items-center gap-2 px-3 py-3 md:py-1.5 text-left text-[13px] md:text-xs transition-colors hover:bg-accent ${
                               index === selectedMentionIndex
                                 ? "bg-accent"
                                 : ""

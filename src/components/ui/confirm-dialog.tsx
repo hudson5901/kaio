@@ -41,11 +41,16 @@ export function ConfirmDialog({
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
         <DialogFooter>
-          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)} disabled={loading}>
+          <Button
+            variant="outline"
+            className="h-11 sm:h-9 text-[14px] sm:text-sm"
+            onClick={() => onOpenChange(false)}
+            disabled={loading}
+          >
             {cancelLabel}
           </Button>
           <Button
-            size="sm"
+            className="h-11 sm:h-9 text-[14px] sm:text-sm font-semibold"
             variant={variant === "destructive" ? "destructive" : "default"}
             onClick={() => { onConfirm(); onOpenChange(false); }}
             disabled={loading}
