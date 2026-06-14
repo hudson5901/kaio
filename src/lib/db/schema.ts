@@ -61,6 +61,9 @@ export const items = pgTable("items", {
   }).default("draft").notNull(),
   ebayCategoryId: text("ebay_category_id"),
   ebayCategoryPath: text("ebay_category_path"),
+  ebayHitCount: integer("ebay_hit_count"),
+  ebayWatchCount: integer("ebay_watch_count"),
+  ebayStatsUpdatedAt: text("ebay_stats_updated_at"),
 
   // 加工済み画像
   processedImages: text("processed_images"), // JSON array of local paths

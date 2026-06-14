@@ -539,6 +539,55 @@ export async function getMyeBaySelling(): Promise<{
 }
 
 /**
+ * GetItem で出品中アイテムの統計 (HitCount / WatchCount) を取得
+ * - HitCount は IncludeWatchCount を ReturnAll にしないと返ってこないケースがある
+ * - 数値が無い場合は null を返す
+ */
+export interface ItemStats {
+  hitCount: number | null;
+  watchCount: number | null;
+  listingStatus: string | null;
+}
+
+export async function getItemStats(itemId: string): Promise<ItemStats> {
+  const response = await callTradingApi(
+    "GetItem",
+    `<ItemID>${itemId}</ItemID>
+    <DetailLevel>ReturnAll</DetailLevel>
+    <IncludeWatchCount>true</IncludeWatchCount>`,
+  );
+
+  const rawItem = response.Item;
+  const item = (Array.isArray(rawItem) ? rawItem[0] : rawItem) as
+    | Record<string, unknown>
+    | undefined;
+  if (!item) {
+    return { hitCount: null, watchCount: null, listingStatus: null };
+  }
+
+  const toNum = (v: unknown): number | null => {
+    if (v == null) return null;
+    const n = typeof v === "number" ? v : parseInt(String(v), 10);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const listingDetails = item.ListingDetails as
+    | Record<string, unknown>
+    | undefined;
+  const sellingStatus = item.SellingStatus as
+    | Record<string, unknown>
+    | undefined;
+
+  return {
+    hitCount: toNum(item.HitCount ?? listingDetails?.HitCount),
+    watchCount: toNum(item.WatchCount ?? sellingStatus?.WatchCount),
+    listingStatus: sellingStatus?.ListingStatus
+      ? String(sellingStatus.ListingStatus)
+      : null,
+  };
+}
+
+/**
  * GetItem で個別アイテムのフル画像URLを取得
  */
 export async function getItemPictureURLs(itemId: string): Promise<string[]> {

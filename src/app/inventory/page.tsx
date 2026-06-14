@@ -23,14 +23,18 @@ const ebayStatusColors: Record<string, string> = {
 };
 
 type TabKey = "listed" | "draft" | "sold" | "all";
+type SortKey = "default" | "watch_desc" | "hit_desc" | "price_desc";
 
 export default function InventoryPage() {
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<TabKey>("listed");
+  const [sort, setSort] = useState<SortKey>("default");
   const [syncing, setSyncing] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [refreshingStats, setRefreshingStats] = useState(false);
+  const [statsResult, setStatsResult] = useState<string | null>(null);
   const [importResult, setImportResult] = useState<string | null>(null);
 
   useEffect(() => { fetchItems(); }, []);
@@ -61,6 +65,27 @@ export default function InventoryPage() {
     finally { setSyncing(false); }
   }
 
+  async function handleRefreshStats() {
+    setRefreshingStats(true);
+    setStatsResult(null);
+    try {
+      const res = await fetch("/api/ebay/refresh-stats", { method: "POST" });
+      const data = await res.json();
+      if (res.ok) {
+        setStatsResult(
+          `eBay統計を更新: 成功 ${data.updated}件 / 失敗 ${data.failed}件 (全 ${data.total}件)`,
+        );
+        await fetchItems();
+      } else {
+        setStatsResult(`エラー: ${data.message || data.error}`);
+      }
+    } catch {
+      setStatsResult("eBay統計の更新中にエラーが発生しました");
+    } finally {
+      setRefreshingStats(false);
+    }
+  }
+
   async function handleEbayImport() {
     setImporting(true);
     setImportResult(null);
@@ -81,18 +106,29 @@ export default function InventoryPage() {
   }
 
   // Filter — タブカウントと一致させる
-  const filtered = items.filter((item) => {
-    const isDraft = item.ebayStatus === "draft" && item.mercariStatus === "available";
-    if (tab === "listed" && item.ebayStatus !== "listed") return false;
-    if (tab === "draft" && !isDraft) return false;
-    if (tab === "sold" && item.ebayStatus !== "sold") return false;
-    if (tab === "all" && item.ebayStatus !== "listed" && !isDraft && item.ebayStatus !== "sold") return false;
-    if (search) {
-      const q = search.toLowerCase();
-      if (!item.mercariTitle.toLowerCase().includes(q) && !item.ebayTitle?.toLowerCase().includes(q)) return false;
-    }
-    return true;
-  });
+  const filtered = items
+    .filter((item) => {
+      const isDraft = item.ebayStatus === "draft" && item.mercariStatus === "available";
+      if (tab === "listed" && item.ebayStatus !== "listed") return false;
+      if (tab === "draft" && !isDraft) return false;
+      if (tab === "sold" && item.ebayStatus !== "sold") return false;
+      if (tab === "all" && item.ebayStatus !== "listed" && !isDraft && item.ebayStatus !== "sold") return false;
+      if (search) {
+        const q = search.toLowerCase();
+        if (!item.mercariTitle.toLowerCase().includes(q) && !item.ebayTitle?.toLowerCase().includes(q)) return false;
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      const cmp = (x: number | null | undefined, y: number | null | undefined) =>
+        (y ?? -1) - (x ?? -1);
+      switch (sort) {
+        case "watch_desc": return cmp(a.ebayWatchCount, b.ebayWatchCount);
+        case "hit_desc": return cmp(a.ebayHitCount, b.ebayHitCount);
+        case "price_desc": return cmp(a.ebayPriceUsd, b.ebayPriceUsd);
+        default: return 0;
+      }
+    });
 
   // Stats — タブカウントと実フィルタ条件を一致させる (draft は「出品可能」なのでメルカリで在庫ありのみ)
   const isDraftListable = (i: typeof items[number]) => i.ebayStatus === "draft" && i.mercariStatus === "available";
@@ -105,6 +141,13 @@ export default function InventoryPage() {
   const listedItems = items.filter((i) => i.ebayStatus === "listed");
   const totalProfit = listedItems.reduce((sum, i) => sum + (i.estimatedProfitUsd ?? 0), 0);
   const pendingCalc = listedItems.filter((i) => i.estimatedProfitUsd == null).length;
+  const totalWatch = listedItems.reduce((sum, i) => sum + (i.ebayWatchCount ?? 0), 0);
+  const totalHit = listedItems.reduce((sum, i) => sum + (i.ebayHitCount ?? 0), 0);
+  const lastStatsAt = listedItems
+    .map((i) => i.ebayStatsUpdatedAt)
+    .filter((s): s is string => !!s)
+    .sort()
+    .at(-1);
 
   const tabs: { key: TabKey; label: string; count: number }[] = [
     { key: "listed", label: "出品中", count: listedCount },
@@ -146,8 +189,36 @@ export default function InventoryPage() {
             </svg>
             {syncing ? "同期中..." : "在庫同期"}
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefreshStats}
+            disabled={refreshingStats}
+            className="gap-1.5 h-10 sm:h-8 text-[13px] sm:text-[12px] col-span-2 sm:col-span-1"
+            title="出品中の全アイテムについて eBay からウォッチ数/閲覧数を取得"
+          >
+            <svg className={`w-4 h-4 ${refreshingStats ? "animate-spin" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z" />
+            </svg>
+            {refreshingStats ? "更新中..." : "eBay統計を更新"}
+          </Button>
         </div>
       </div>
+
+      {/* Stats Result */}
+      {statsResult && (
+        <div className="flex items-center justify-between rounded-xl bg-card border border-border p-3">
+          <p className="text-sm text-muted-foreground">{statsResult}</p>
+          <button
+            onClick={() => setStatsResult(null)}
+            className="text-muted-foreground hover:text-foreground ml-2"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      )}
 
       {/* Import Result */}
       {importResult && (
@@ -164,8 +235,8 @@ export default function InventoryPage() {
         </div>
       )}
 
-      {/* Stats: 2x2 on mobile, 4 col on desktop */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+      {/* Stats: 2x3 on mobile, 6 col on desktop */}
+      <div className="grid grid-cols-2 sm:grid-cols-6 gap-2 sm:gap-3">
         <div className="rounded-xl bg-card border border-border p-3">
           <p className="text-[11px] text-muted-foreground">出品中</p>
           <p className="text-[20px] sm:text-xl font-bold mt-0.5 tabular-nums">{listedCount}</p>
@@ -184,10 +255,27 @@ export default function InventoryPage() {
           )}
         </div>
         <div className="rounded-xl bg-card border border-border p-3">
+          <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+            <span>👀</span>合計閲覧
+          </p>
+          <p className="text-[20px] sm:text-xl font-bold mt-0.5 tabular-nums">{totalHit.toLocaleString()}</p>
+        </div>
+        <div className="rounded-xl bg-card border border-border p-3">
+          <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+            <span>⭐</span>合計ウォッチ
+          </p>
+          <p className="text-[20px] sm:text-xl font-bold mt-0.5 tabular-nums text-amber-400">{totalWatch.toLocaleString()}</p>
+        </div>
+        <div className="rounded-xl bg-card border border-border p-3">
           <p className="text-[11px] text-muted-foreground">販売済み</p>
           <p className="text-[20px] sm:text-xl font-bold mt-0.5 tabular-nums">{soldCount}</p>
         </div>
       </div>
+      {lastStatsAt && (
+        <p className="text-[11px] text-muted-foreground -mt-1">
+          eBay統計最終取得: {new Date(lastStatsAt).toLocaleString("ja-JP")}
+        </p>
+      )}
 
       {/* Tabs (scroll horizontally on mobile) */}
       <div className="flex gap-1 overflow-x-auto no-scrollbar -mx-3 px-3 sm:mx-0 sm:px-0 border-b border-border/60 sm:border-b-0">
@@ -207,20 +295,32 @@ export default function InventoryPage() {
         ))}
       </div>
 
-      {/* Search */}
-      <div className="relative">
-        <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
-        </svg>
-        <Input
-          placeholder="商品名・出品者で検索..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          inputMode="search"
-          enterKeyHint="search"
-          className="pl-10 h-11 sm:h-9"
-        />
-        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[12px] text-muted-foreground tabular-nums pointer-events-none">{filtered.length}件</span>
+      {/* Search + Sort */}
+      <div className="flex flex-col sm:flex-row gap-2">
+        <div className="relative flex-1">
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+          </svg>
+          <Input
+            placeholder="商品名・出品者で検索..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            inputMode="search"
+            enterKeyHint="search"
+            className="pl-10 h-11 sm:h-9"
+          />
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[12px] text-muted-foreground tabular-nums pointer-events-none">{filtered.length}件</span>
+        </div>
+        <select
+          value={sort}
+          onChange={(e) => setSort(e.target.value as SortKey)}
+          className="h-11 sm:h-9 rounded-md border border-input bg-background px-3 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
+        >
+          <option value="default">並び替え: デフォルト</option>
+          <option value="watch_desc">⭐ ウォッチ多い順</option>
+          <option value="hit_desc">👀 閲覧多い順</option>
+          <option value="price_desc">💰 価格高い順</option>
+        </select>
       </div>
 
       {/* List */}
@@ -286,8 +386,8 @@ export default function InventoryPage() {
                       {item.mercariTitle}
                       {item.mercariSeller && <span className="ml-2">/ {item.mercariSeller}</span>}
                     </p>
-                    {/* MOBILE: 4 metrics in 2x2 compact grid under title */}
-                    <div className="sm:hidden mt-2 grid grid-cols-4 gap-1.5 text-[11px] tabular-nums">
+                    {/* MOBILE: 6 metrics in 3x2 compact grid under title */}
+                    <div className="sm:hidden mt-2 grid grid-cols-3 gap-1.5 text-[11px] tabular-nums">
                       <div>
                         <div className="text-muted-foreground leading-tight">仕入</div>
                         <div className="leading-tight">¥{(item.mercariPrice ?? 0).toLocaleString()}</div>
@@ -304,6 +404,16 @@ export default function InventoryPage() {
                         }`}>{item.estimatedProfitUsd != null ? `$${item.estimatedProfitUsd.toFixed(0)}` : "-"}</div>
                       </div>
                       <div>
+                        <div className="text-muted-foreground leading-tight">👀 閲覧</div>
+                        <div className="leading-tight">{item.ebayHitCount != null ? item.ebayHitCount.toLocaleString() : "-"}</div>
+                      </div>
+                      <div>
+                        <div className="text-muted-foreground leading-tight">⭐ ウォッチ</div>
+                        <div className={`leading-tight ${(item.ebayWatchCount ?? 0) > 0 ? "text-amber-400 font-medium" : ""}`}>
+                          {item.ebayWatchCount != null ? item.ebayWatchCount.toLocaleString() : "-"}
+                        </div>
+                      </div>
+                      <div>
                         <div className="text-muted-foreground leading-tight">送料</div>
                         <div className="leading-tight text-muted-foreground">{item.shippingCostUsd ? `$${item.shippingCostUsd.toFixed(0)}` : "-"}</div>
                       </div>
@@ -312,6 +422,16 @@ export default function InventoryPage() {
 
                   {/* DESKTOP: Prices */}
                   <div className="hidden sm:flex items-center gap-5 flex-shrink-0">
+                    <div className="text-right w-14">
+                      <p className="text-xs text-muted-foreground">👀 閲覧</p>
+                      <p className="text-sm tabular-nums">{item.ebayHitCount != null ? item.ebayHitCount.toLocaleString() : "-"}</p>
+                    </div>
+                    <div className="text-right w-14">
+                      <p className="text-xs text-muted-foreground">⭐ ウォッチ</p>
+                      <p className={`text-sm tabular-nums ${(item.ebayWatchCount ?? 0) > 0 ? "text-amber-400 font-semibold" : ""}`}>
+                        {item.ebayWatchCount != null ? item.ebayWatchCount.toLocaleString() : "-"}
+                      </p>
+                    </div>
                     <div className="text-right">
                       <p className="text-xs text-muted-foreground">仕入れ</p>
                       <p className="text-sm tabular-nums">¥{(item.mercariPrice ?? 0).toLocaleString()}</p>
@@ -329,12 +449,6 @@ export default function InventoryPage() {
                         item.estimatedProfitUsd ? "text-red-400" : "text-muted-foreground"
                       }`}>
                         {item.estimatedProfitUsd != null ? `$${item.estimatedProfitUsd.toFixed(0)}` : "-"}
-                      </p>
-                    </div>
-                    <div className="text-right w-16">
-                      <p className="text-xs text-muted-foreground">送料</p>
-                      <p className="text-sm tabular-nums text-muted-foreground">
-                        {item.shippingCostUsd ? `$${item.shippingCostUsd.toFixed(0)}` : "-"}
                       </p>
                     </div>
 
