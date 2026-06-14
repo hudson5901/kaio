@@ -112,13 +112,18 @@ export async function callTradingApi(
       return { ...e, _params: params };
     });
 
+    // ErrorParameters の ParamID は XML 上の属性。fast-xml-parser は ignoreAttributes:false
+    // のとき attribute を "@_ParamID" の prefix 付きで格納するので、両方の鍵を見る。
+    const getParamId = (p: Record<string, unknown>): string =>
+      String(p["@_ParamID"] ?? p.ParamID ?? "");
+
     const errMsg = normalizedErrs
       .map((e) => {
         const code = e.ErrorCode;
         const short = e.ShortMessage || "";
         const long = e.LongMessage && e.LongMessage !== short ? ` — ${e.LongMessage}` : "";
         const params = e._params.length
-          ? ` (${e._params.map((p) => `${p.ParamID}=${p.Value}`).join(", ")})`
+          ? ` (${e._params.map((p) => `${getParamId(p)}=${p.Value}`).join(", ")})`
           : "";
         return `[${code}] ${short}${long}${params}`;
       })
@@ -132,7 +137,7 @@ export async function callTradingApi(
     // ParamID=0 が旧 ID、ParamID=1 が新 ID というのが eBay の慣例
     const replaced = normalizedErrs.find((e) => Number(e.ErrorCode) === 20505);
     if (replaced) {
-      const newCat = replaced._params.find((p) => String(p.ParamID) === "1");
+      const newCat = replaced._params.find((p) => getParamId(p) === "1");
       if (newCat?.Value) {
         (err as Error & { suggestedCategoryId?: string }).suggestedCategoryId = String(newCat.Value);
       }
