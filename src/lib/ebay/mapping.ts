@@ -76,12 +76,18 @@ export function mapItemToEbayListing(item: Item): EbayListingData {
   }
 
   // eBayカテゴリID
+  // 優先順位: 1) per-item で明示選択された ebayCategoryId
+  //         2) kabutoCategory からの自動マッピング
+  //         3) フォールバック 262317 (Asian Antiques > Japan > Armor)
   let categoryId = "262317";
   if (item.kabutoCategory) {
     const category = getCategory(item.kabutoCategory as KabutoCategory);
     if (category) {
       categoryId = category.ebayCategoryId;
     }
+  }
+  if (item.ebayCategoryId) {
+    categoryId = item.ebayCategoryId;
   }
 
   // コンディション

@@ -28,6 +28,8 @@ function makeItem(overrides: Partial<Item> = {}): Item {
     ebayDescriptionJa: null,
     ebayAspectsJa: null,
     ebayStatus: "draft",
+    ebayCategoryId: null,
+    ebayCategoryPath: null,
     processedImages: null,
     weightG: null,
     lengthCm: null,

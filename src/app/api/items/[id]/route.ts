@@ -431,7 +431,15 @@ export async function PATCH(
 
     case "toggle_staff_check": {
       const checkKey = String(body.checkKey || "");
-      const VALID_KEYS = ["images", "title", "description", "price", "weight"] as const;
+      const VALID_KEYS = [
+        "images",
+        "title",
+        "description",
+        "price",
+        "weight",
+        "dimensions",
+        "category",
+      ] as const;
       if (!VALID_KEYS.includes(checkKey as typeof VALID_KEYS[number])) {
         return NextResponse.json({ error: "Invalid checkKey" }, { status: 400 });
       }
@@ -460,6 +468,10 @@ export async function PATCH(
         description: !!item.ebayDescription,
         price: !!item.ebayPriceUsd,
         weight: !!item.weightG,
+        dimensions:
+          item.lengthCm != null && item.widthCm != null && item.heightCm != null,
+        // カテゴリは "明示的に選択された (ebayCategoryId が入っている)" 場合のみ AI 側 OK
+        category: !!item.ebayCategoryId,
       };
 
       // 全スタッフ取得
@@ -520,6 +532,8 @@ export async function PATCH(
         "kabutoCategory",
         "kabutoCategoryConfidence",
         "ebayAspects",
+        "ebayCategoryId",
+        "ebayCategoryPath",
       ];
 
       const updates: Record<string, unknown> = {};

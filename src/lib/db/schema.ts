@@ -59,6 +59,8 @@ export const items = pgTable("items", {
   ebayStatus: text("ebay_status", {
     enum: ["draft", "listed", "sold", "removed"]
   }).default("draft").notNull(),
+  ebayCategoryId: text("ebay_category_id"),
+  ebayCategoryPath: text("ebay_category_path"),
 
   // 加工済み画像
   processedImages: text("processed_images"), // JSON array of local paths

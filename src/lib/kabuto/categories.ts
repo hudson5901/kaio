@@ -353,7 +353,7 @@ export const KABUTO_CATEGORIES: Record<KabutoCategory, KabutoCategoryDef> = {
     defaultWeightG: 2000,
     defaultDimensions: { lengthCm: 25, widthCm: 25, heightCm: 20 },
     promptHints: "This is a lacquerware (urushi) item. Identify form (jubako stacked box, bowl, tray, document box) and decoration technique (makie gold powder painting, raden mother-of-pearl inlay, kinpaku gold leaf).",
-    ebayCategoryId: "20503", // Asian Antiques > Japan > Lacquer
+    ebayCategoryId: "20507", // Asian Antiques > Japan > Other (旧 20503 Lacquer は廃止)
     defaultCondition: "USED_GOOD",
     keywords: ["漆器", "重箱", "蒔絵", "螺鈿", "うるし", "漆塗り", "金箔", "蒔絵箱"],
     negativeKeywords: ["兜", "鎧", "刀"],
