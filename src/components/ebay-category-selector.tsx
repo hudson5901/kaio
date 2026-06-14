@@ -33,7 +33,8 @@ export function EbayCategorySelector({
   fallbackLabel,
   onSaved,
 }: Props) {
-  const [open, setOpen] = useState(false);
+  // 未選択のアイテムは最初から開いておく (ユーザがどこを触ればいいか即わかるように)
+  const [open, setOpen] = useState(!currentCategoryId);
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [loading, setLoading] = useState(false);
@@ -64,19 +65,20 @@ export function EbayCategorySelector({
     }
   }
 
-  // 初回展開時にタイトル/説明文からサジェスト
+  // 初回展開時にタイトルからサジェスト (説明文は HTML タグや冗長な情報が多く Taxonomy API のノイズになる)
   useEffect(() => {
     if (!open || hasLoadedInitial) return;
-    const seed = [seedTitle, seedDescription]
-      .filter(Boolean)
-      .join(" ")
-      .slice(0, 200);
-    if (seed.trim()) {
+    const seed = (seedTitle ?? "")
+      .replace(/<[^>]*>/g, " ") // 念のため HTML タグ除去
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 80); // eBay Taxonomy は短く端的なキーワードが効く
+    if (seed) {
       setQuery(seed);
       fetchSuggestions(seed);
     }
     setHasLoadedInitial(true);
-  }, [open, hasLoadedInitial, seedTitle, seedDescription]);
+  }, [open, hasLoadedInitial, seedTitle]);
 
   // 検索ボックスのデバウンス
   function onQueryChange(v: string) {
@@ -166,18 +168,18 @@ export function EbayCategorySelector({
           <Button
             type="button"
             size="sm"
-            variant={open ? "secondary" : "outline"}
-            className="text-xs h-7"
+            variant={open ? "secondary" : selected ? "outline" : "default"}
+            className="text-[13px] sm:text-xs h-10 sm:h-7 px-4 sm:px-2.5"
             onClick={() => setOpen((v) => !v)}
           >
-            {open ? "閉じる" : selected ? "変更" : "選択"}
+            {open ? "閉じる" : selected ? "変更" : "カテゴリを選ぶ"}
           </Button>
           {selected && (
             <Button
               type="button"
               size="sm"
               variant="ghost"
-              className="text-xs h-7 text-muted-foreground"
+              className="text-[13px] sm:text-xs h-10 sm:h-7 text-muted-foreground"
               onClick={clear}
               disabled={saving === "clear"}
             >
@@ -190,14 +192,42 @@ export function EbayCategorySelector({
           <div className="space-y-3 pt-2 border-t border-border/40">
             <div className="space-y-1">
               <label className="text-[11px] text-muted-foreground">
-                検索 (タイトルや英単語)
+                検索 (タイトルや英単語、なるべく短く)
               </label>
-              <Input
-                value={query}
-                onChange={(e) => onQueryChange(e.target.value)}
-                placeholder="例: samurai helmet, kabuto, ukiyo-e"
-                className="h-8 text-[13px]"
-              />
+              <div className="relative">
+                <Input
+                  value={query}
+                  onChange={(e) => onQueryChange(e.target.value)}
+                  placeholder="例: samurai helmet, kabuto, lacquer box"
+                  className="h-10 sm:h-9 text-[15px] sm:text-[13px] pr-8"
+                  autoFocus
+                />
+                {query && (
+                  <button
+                    type="button"
+                    onClick={() => { setQuery(""); setSuggestions([]); }}
+                    aria-label="検索をクリア"
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center text-muted-foreground hover:text-foreground rounded"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+              {/* 1クリック検索ショートカット - 漢字タイトルを英語キーワードに置き換えるのは面倒なので、よく使うのを並べる */}
+              <div className="flex flex-wrap gap-1 pt-1">
+                {["samurai helmet", "kabuto", "lacquer box", "netsuke", "ukiyo-e print", "sword tsuba", "ceramic tea bowl", "ivory"].map((kw) => (
+                  <button
+                    key={kw}
+                    type="button"
+                    onClick={() => { setQuery(kw); fetchSuggestions(kw); }}
+                    className="text-[11px] px-2 py-1 rounded border border-border/60 text-muted-foreground hover:border-border hover:text-foreground transition-colors"
+                  >
+                    {kw}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {error && (
