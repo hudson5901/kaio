@@ -281,7 +281,7 @@ export default function ScrapePage() {
         </div>
 
         {/* Auto-process toggle — bigger switch on mobile */}
-        <label className="flex items-center gap-3 cursor-pointer py-1">
+        <label className="flex items-center gap-3 cursor-pointer py-1 min-w-0">
           <div
             onClick={() => !running && setAutoProcess(!autoProcess)}
             className={`relative w-12 h-7 sm:w-10 sm:h-5 rounded-full transition-colors flex-shrink-0 ${
@@ -294,28 +294,29 @@ export default function ScrapePage() {
               }`}
             />
           </div>
-          <span className="text-[13px] sm:text-sm text-muted-foreground">
-            スクレイプ後に自動処理（詳細取得・画像処理・費用計算）
+          <span className="text-[13px] sm:text-sm text-muted-foreground min-w-0 leading-snug">
+            <span className="sm:hidden">取得後に自動処理</span>
+            <span className="hidden sm:inline">スクレイプ後に自動処理（詳細取得・画像処理・費用計算）</span>
           </span>
         </label>
 
         {/* Submit / Stop */}
-        <div className="flex gap-3">
+        <div className="flex gap-2 sm:gap-3">
           <Button
             onClick={startPipeline}
             disabled={running}
-            className="flex-1 h-12 sm:h-10 text-[14px] sm:text-sm font-semibold gap-2"
+            className="flex-1 h-12 sm:h-10 text-[14px] sm:text-sm font-semibold gap-2 min-w-0"
           >
             {running ? (
               <>
-                <svg className="w-4 h-4 animate-spin-slow" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <svg className="w-4 h-4 animate-spin-slow shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" />
                 </svg>
-                {activeStep ? `${activeStep.label}中...` : "処理中..."}
+                <span className="truncate">{activeStep ? `${activeStep.label}中...` : "処理中..."}</span>
               </>
             ) : (
               <>
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" />
                 </svg>
                 パイプライン実行
@@ -323,7 +324,7 @@ export default function ScrapePage() {
             )}
           </Button>
           {running && (
-            <Button variant="destructive" onClick={stopPipeline} className="h-10 px-5">
+            <Button variant="destructive" onClick={stopPipeline} className="h-12 sm:h-10 px-5 shrink-0">
               停止
             </Button>
           )}
@@ -429,24 +430,24 @@ export default function ScrapePage() {
           既存アイテムの再処理
         </h3>
         <p className="text-[11px] text-muted-foreground/60">
-          スクレイプ済みアイテムに対して、詳細取得・画像取得・画像処理・費用計算を個別実行
+          スクレイプ済みアイテムに対して個別実行
         </p>
-        <div className="flex gap-2 flex-wrap">
-          <Button variant="outline" size="sm" disabled={running} className="text-xs"
+        <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
+          <Button variant="outline" size="sm" disabled={running} className="h-10 sm:h-8 text-[13px] sm:text-[12px]"
             onClick={() => runStep("details", "fetch_details")}>
-            詳細取得のみ
+            詳細取得
           </Button>
-          <Button variant="outline" size="sm" disabled={running} className="text-xs"
+          <Button variant="outline" size="sm" disabled={running} className="h-10 sm:h-8 text-[13px] sm:text-[12px]"
             onClick={() => runStep("images", "infer_images")}>
-            画像一括取得
+            画像取得
           </Button>
-          <Button variant="outline" size="sm" disabled={running} className="text-xs"
+          <Button variant="outline" size="sm" disabled={running} className="h-10 sm:h-8 text-[13px] sm:text-[12px]"
             onClick={() => runStep("images", "process_images")}>
-            画像処理のみ
+            画像処理
           </Button>
-          <Button variant="outline" size="sm" disabled={running} className="text-xs"
+          <Button variant="outline" size="sm" disabled={running} className="h-10 sm:h-8 text-[13px] sm:text-[12px]"
             onClick={() => runStep("costs", "calculate_costs")}>
-            費用計算のみ
+            費用計算
           </Button>
         </div>
       </div>

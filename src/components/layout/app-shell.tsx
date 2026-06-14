@@ -149,7 +149,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </Link>
           </div>
         </header>
-        <main>
+        <main className="overflow-x-hidden">
           <div className="px-3 sm:px-10 py-3 max-w-[1200px] animate-fade-in has-mobile-bottom-nav">{children}</div>
         </main>
       </div>

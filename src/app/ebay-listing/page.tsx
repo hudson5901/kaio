@@ -363,16 +363,19 @@ export default function EbayListingPage() {
       {loading ? (
         <div className="border border-border/60 rounded-lg overflow-hidden">
           {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className={`grid grid-cols-[32px_36px_1fr_80px_80px_80px_80px_60px_50px] gap-0 px-3 py-2.5 items-center ${i > 0 ? "border-t border-border/30" : ""}`}>
-              <div />
-              <div className="w-7 h-7 rounded bg-accent animate-pulse" />
-              <div className="h-3.5 bg-accent rounded w-3/4 animate-pulse" />
-              <div className="h-3 bg-accent/60 rounded w-12 ml-auto animate-pulse" />
-              <div className="h-3 bg-accent/60 rounded w-10 ml-auto animate-pulse" />
-              <div className="h-3 bg-accent/60 rounded w-10 ml-auto animate-pulse" />
-              <div className="h-3 bg-accent/60 rounded w-10 ml-auto animate-pulse" />
-              <div className="h-3 bg-accent/60 rounded w-5 mx-auto animate-pulse" />
-              <div className="h-3 bg-accent/60 rounded w-6 ml-auto animate-pulse" />
+            <div key={i} className={`flex items-center gap-3 px-3 py-3 sm:grid sm:grid-cols-[32px_36px_1fr_80px_80px_80px_80px_60px_50px] sm:gap-0 sm:py-2.5 ${i > 0 ? "border-t border-border/30" : ""}`}>
+              <div className="hidden sm:block" />
+              <div className="w-12 h-12 sm:w-7 sm:h-7 rounded bg-accent animate-pulse shrink-0" />
+              <div className="flex-1 space-y-1.5 sm:space-y-0 min-w-0">
+                <div className="h-3.5 bg-accent rounded w-3/4 animate-pulse" />
+                <div className="sm:hidden h-2.5 bg-accent/60 rounded w-1/3 animate-pulse" />
+              </div>
+              <div className="hidden sm:block h-3 bg-accent/60 rounded w-12 ml-auto animate-pulse" />
+              <div className="hidden sm:block h-3 bg-accent/60 rounded w-10 ml-auto animate-pulse" />
+              <div className="hidden sm:block h-3 bg-accent/60 rounded w-10 ml-auto animate-pulse" />
+              <div className="hidden sm:block h-3 bg-accent/60 rounded w-10 ml-auto animate-pulse" />
+              <div className="hidden sm:block h-3 bg-accent/60 rounded w-5 mx-auto animate-pulse" />
+              <div className="h-3 bg-accent/60 rounded w-12 sm:w-6 ml-auto animate-pulse shrink-0" />
             </div>
           ))}
         </div>
